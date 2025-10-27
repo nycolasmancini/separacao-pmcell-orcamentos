@@ -1,0 +1,96 @@
+{# Partial Template: Card de Métricas de Tempo #}
+{# Este componente renderiza o card de métricas de tempo médio de separação #}
+{# Recebe como contexto: metricas_tempo (dict com tempo_medio_hoje_minutos, tempo_medio_7dias_minutos, percentual_diferenca, tendencia) #}
+
+<div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-lg border-2 border-blue-200 mb-6">
+    <div class="p-6">
+        <!-- Título do Card -->
+        <div class="flex items-center mb-4">
+            <svg class="h-8 w-8 mr-3 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h2 class="text-xl font-bold text-gray-900">TEMPO MÉDIO DE SEPARAÇÃO</h2>
+        </div>
+
+        <div class="border-t-2 border-blue-300 mb-4"></div>
+
+        {% if metricas_tempo.tendencia == 'sem_dados' %}
+            {# Caso não haja dados #}
+            <div class="text-center py-8">
+                <svg class="h-16 w-16 mx-auto text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <p class="text-lg text-gray-600 font-medium">Sem dados disponíveis</p>
+                <p class="text-sm text-gray-500 mt-2">Nenhum pedido finalizado encontrado para calcular métricas.</p>
+            </div>
+        {% else %}
+            {# Exibição das métricas #}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                <!-- Tempo Médio Hoje -->
+                <div class="text-center bg-white rounded-lg p-4 shadow-sm">
+                    <div class="flex items-center justify-center mb-2">
+                        <svg class="h-5 w-5 mr-2 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span class="text-sm font-medium text-gray-600">Hoje</span>
+                    </div>
+                    <p class="text-4xl font-bold text-blue-700">{{ metricas_tempo.tempo_hoje_formatado }}</p>
+                </div>
+
+                <!-- Tempo Médio Últimos 7 Dias -->
+                <div class="text-center bg-white rounded-lg p-4 shadow-sm">
+                    <div class="flex items-center justify-center mb-2">
+                        <svg class="h-5 w-5 mr-2 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <span class="text-sm font-medium text-gray-600">Últimos 7 dias</span>
+                    </div>
+                    <p class="text-4xl font-bold text-indigo-700">{{ metricas_tempo.tempo_7dias_formatado }}</p>
+                </div>
+            </div>
+
+            {# Indicador de Tendência #}
+            {% if metricas_tempo.tendencia != 'sem_dados' %}
+                <div class="text-center mt-4">
+                    {% if metricas_tempo.tendencia == 'melhorou' %}
+                        {# Tendência positiva - mais rápido #}
+                        <div class="inline-flex items-center px-4 py-2 rounded-full bg-green-100 border-2 border-green-300">
+                            <svg class="h-6 w-6 mr-2 text-green-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M17 8V5l-5-5" transform="rotate(180 12 12)" />
+                            </svg>
+                            <span class="text-lg font-bold text-green-800">
+                                {{ metricas_tempo.percentual_formatado }} Melhorou! 🎉
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-600 mt-2">Equipe está mais rápida hoje em comparação aos últimos 7 dias</p>
+
+                    {% elif metricas_tempo.tendencia == 'piorou' %}
+                        {# Tendência negativa - mais lento #}
+                        <div class="inline-flex items-center px-4 py-2 rounded-full bg-red-100 border-2 border-red-300">
+                            <svg class="h-6 w-6 mr-2 text-red-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M13 17l5-5m0 0l-5-5m5 5H6" />
+                            </svg>
+                            <span class="text-lg font-bold text-red-800">
+                                {{ metricas_tempo.percentual_formatado }} Mais lento
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-600 mt-2">Equipe está mais lenta hoje em comparação aos últimos 7 dias</p>
+
+                    {% elif metricas_tempo.tendencia == 'estavel' %}
+                        {# Tendência estável #}
+                        <div class="inline-flex items-center px-4 py-2 rounded-full bg-gray-100 border-2 border-gray-300">
+                            <svg class="h-6 w-6 mr-2 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 12h14" />
+                            </svg>
+                            <span class="text-lg font-bold text-gray-800">
+                                {{ metricas_tempo.percentual_formatado }} Estável
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-600 mt-2">Performance similar aos últimos 7 dias (variação menor que 5%)</p>
+                    {% endif %}
+                </div>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>

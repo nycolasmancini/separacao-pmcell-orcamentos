@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Separação PMCELL{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+        <!-- Logo/Header -->
+        <div class="text-center">
+            <h2 class="mt-6 text-4xl font-bold text-gray-900">
+                PMCELL
+            </h2>
+            <p class="mt-2 text-sm text-gray-600">
+                Sistema de Separação de Pedidos
+            </p>
+        </div>
+
+        <!-- Card de Login -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 space-y-6" x-data="{ loading: false }">
+            <div>
+                <h3 class="text-xl font-semibold text-gray-900 text-center">
+                    Faça seu login
+                </h3>
+                <p class="mt-1 text-sm text-gray-500 text-center">
+                    Digite seu número e PIN para continuar
+                </p>
+            </div>
+
+            <!-- Mensagens -->
+            {% if messages %}
+                <div class="space-y-2">
+                    {% for message in messages %}
+                        <div class="p-4 rounded-lg {% if message.tags == 'error' %}bg-red-50 border border-red-200{% elif message.tags == 'success' %}bg-green-50 border border-green-200{% else %}bg-blue-50 border border-blue-200{% endif %}">
+                            <p class="text-sm {% if message.tags == 'error' %}text-red-700{% elif message.tags == 'success' %}text-green-700{% else %}text-blue-700{% endif %}">
+                                {{ message }}
+                            </p>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <!-- Formulário -->
+            <form method="post" action="{% url 'login' %}" class="space-y-6" @submit="loading = true">
+                {% csrf_token %}
+
+                <!-- Número de Login -->
+                <div>
+                    <label for="id_numero_login" class="block text-sm font-medium text-gray-700 mb-2">
+                        Número de Login
+                    </label>
+                    {{ form.numero_login }}
+                    {% if form.numero_login.errors %}
+                        <div class="mt-2">
+                            {% for error in form.numero_login.errors %}
+                                <p class="text-sm text-red-600">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- PIN -->
+                <div>
+                    <label for="id_pin" class="block text-sm font-medium text-gray-700 mb-2">
+                        PIN (4 dígitos)
+                    </label>
+                    {{ form.pin }}
+                    {% if form.pin.errors %}
+                        <div class="mt-2">
+                            {% for error in form.pin.errors %}
+                                <p class="text-sm text-red-600">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Botão de Submit -->
+                <div>
+                    <button
+                        type="submit"
+                        class="w-full flex justify-center items-center py-3 px-4 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        :disabled="loading"
+                    >
+                        <span x-show="!loading">Entrar</span>
+                        <span x-show="loading" class="flex items-center">
+                            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Entrando...
+                        </span>
+                    </button>
+                </div>
+            </form>
+
+            <!-- Footer do card -->
+            <div class="text-center">
+                <p class="text-xs text-gray-500">
+                    Problemas para acessar? Entre em contato com o administrador
+                </p>
+            </div>
+        </div>
+
+        <!-- Footer da página -->
+        <div class="text-center text-sm text-gray-500">
+            <p>&copy; 2025 PMCELL São Paulo - Sistema de Separação de Pedidos</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

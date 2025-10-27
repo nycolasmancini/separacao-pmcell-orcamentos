@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Pedido #{{ pedido.numero_orcamento }} - Separação PMCELL{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">Pedido #{{ pedido.numero_orcamento }}</h1>
+                    <p class="text-sm text-gray-600">{{ pedido.nome_cliente }}</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <!-- Botão Voltar -->
+                    <a href="{% url 'dashboard' %}" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors shadow-sm">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                        </svg>
+                        Voltar ao Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Card de Informações do Pedido -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Vendedor -->
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">Vendedor</p>
+                    <div class="flex items-center text-gray-900">
+                        <svg class="h-5 w-5 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        <span class="font-semibold">{{ pedido.vendedor.nome }}</span>
+                    </div>
+                </div>
+
+                <!-- Logística e Embalagem -->
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">Logística / Embalagem</p>
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            {{ pedido.get_logistica_display }}
+                        </span>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            {{ pedido.get_embalagem_display }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Tempo Decorrido -->
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">Tempo Decorrido</p>
+                    <div class="flex items-center text-gray-900">
+                        <svg class="h-5 w-5 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span class="text-2xl font-bold text-blue-600">{{ tempo_decorrido_minutos }} min</span>
+                    </div>
+                </div>
+
+                <!-- Progresso -->
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">Progresso</p>
+                    <div class="flex items-center">
+                        <span class="text-2xl font-bold text-green-600">{{ progresso_percentual }}%</span>
+                        <span class="text-sm text-gray-500 ml-2">({{ itens_separados|length }}/{{ itens_separados|length|add:itens_nao_separados|length }})</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Barra de Progresso Visual -->
+            <div class="mt-6">
+                <div class="w-full bg-gray-200 rounded-full h-3">
+                    <div class="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-500" style="width: {{ progresso_percentual }}%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção: Itens Não Separados -->
+        {% if itens_nao_separados %}
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold text-gray-900 flex items-center">
+                    <svg class="h-6 w-6 mr-2 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Itens Não Separados
+                </h2>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+                    {{ itens_nao_separados|length }} itens
+                </span>
+            </div>
+
+            <div class="space-y-3">
+                {% for item in itens_nao_separados %}
+                    {% include 'partials/_item_pedido.html' with item=item pedido=pedido %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Seção: Itens Separados -->
+        {% if itens_separados %}
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold text-gray-900 flex items-center">
+                    <svg class="h-6 w-6 mr-2 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Itens Separados
+                </h2>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                    {{ itens_separados|length }} itens
+                </span>
+            </div>
+
+            <div class="space-y-3">
+                {% for item in itens_separados %}
+                    {% include 'partials/_item_pedido.html' with item=item pedido=pedido %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Estado Vazio -->
+        {% if not itens_nao_separados and not itens_separados %}
+        <div class="bg-white rounded-lg shadow-md p-12 text-center">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">Nenhum item encontrado</h3>
+            <p class="mt-1 text-sm text-gray-500">Este pedido não possui itens cadastrados.</p>
+        </div>
+        {% endif %}
+    </main>
+</div>
+{% endblock %}

@@ -1,0 +1,144 @@
+{# Partial template para grid de pedidos - Fase 19 #}
+{# Usado para: #}
+{# - Renderização inicial do dashboard #}
+{# - Atualizações via HTMX (paginação, busca, filtros) #}
+
+<div id="pedidos-grid" class="space-y-6">
+    {% if pedidos.results %}
+        <!-- Grid de Cards de Pedidos -->
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {% for pedido_data in pedidos.results %}
+                {% include "partials/_card_pedido.html" with pedido_data=pedido_data %}
+            {% endfor %}
+        </div>
+
+        <!-- Paginação -->
+        {% if pedidos.num_pages > 1 %}
+            <div class="mt-8 flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 rounded-lg shadow-sm">
+                <div class="flex flex-1 justify-between sm:hidden">
+                    <!-- Mobile Pagination -->
+                    {% if pedidos.has_previous %}
+                        <button
+                            hx-get="?page={{ pedidos.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if vendedor_id %}&vendedor={{ vendedor_id }}{% endif %}"
+                            hx-target="#pedidos-grid"
+                            hx-swap="outerHTML"
+                            hx-indicator="#loading-spinner"
+                            class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                            Anterior
+                        </button>
+                    {% else %}
+                        <span class="relative inline-flex items-center rounded-md border border-gray-300 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-400 cursor-not-allowed">
+                            Anterior
+                        </span>
+                    {% endif %}
+
+                    {% if pedidos.has_next %}
+                        <button
+                            hx-get="?page={{ pedidos.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if vendedor_id %}&vendedor={{ vendedor_id }}{% endif %}"
+                            hx-target="#pedidos-grid"
+                            hx-swap="outerHTML"
+                            hx-indicator="#loading-spinner"
+                            class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                            Próxima
+                        </button>
+                    {% else %}
+                        <span class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-400 cursor-not-allowed">
+                            Próxima
+                        </span>
+                    {% endif %}
+                </div>
+
+                <!-- Desktop Pagination -->
+                <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-sm text-gray-700">
+                            Mostrando
+                            <span class="font-medium">{{ pedidos.results|length }}</span>
+                            de
+                            <span class="font-medium">{{ pedidos.count }}</span>
+                            pedido(s)
+                        </p>
+                    </div>
+                    <div>
+                        <nav class="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Paginação">
+                            <!-- Botão Anterior -->
+                            {% if pedidos.has_previous %}
+                                <button
+                                    hx-get="?page={{ pedidos.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if vendedor_id %}&vendedor={{ vendedor_id }}{% endif %}"
+                                    hx-target="#pedidos-grid"
+                                    hx-swap="outerHTML"
+                                    hx-indicator="#loading-spinner"
+                                    class="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
+                                >
+                                    <span class="sr-only">Anterior</span>
+                                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                            {% else %}
+                                <span class="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-300 ring-1 ring-inset ring-gray-300 cursor-not-allowed">
+                                    <span class="sr-only">Anterior</span>
+                                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
+                                    </svg>
+                                </span>
+                            {% endif %}
+
+                            <!-- Página Atual -->
+                            <span class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 bg-gray-50 focus:outline-offset-0">
+                                Página {{ pedidos.current_page }} de {{ pedidos.num_pages }}
+                            </span>
+
+                            <!-- Botão Próxima -->
+                            {% if pedidos.has_next %}
+                                <button
+                                    hx-get="?page={{ pedidos.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if vendedor_id %}&vendedor={{ vendedor_id }}{% endif %}"
+                                    hx-target="#pedidos-grid"
+                                    hx-swap="outerHTML"
+                                    hx-indicator="#loading-spinner"
+                                    class="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
+                                >
+                                    <span class="sr-only">Próxima</span>
+                                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                            {% else %}
+                                <span class="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-300 ring-1 ring-inset ring-gray-300 cursor-not-allowed">
+                                    <span class="sr-only">Próxima</span>
+                                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+                                    </svg>
+                                </span>
+                            {% endif %}
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    {% else %}
+        <!-- Estado Vazio -->
+        <div class="bg-white rounded-lg shadow-md p-12 text-center">
+            <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            </svg>
+            <h3 class="mt-4 text-lg font-medium text-gray-900">Nenhum pedido encontrado</h3>
+            <p class="mt-2 text-sm text-gray-500">
+                Nenhum pedido em separação corresponde aos filtros aplicados.
+            </p>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Loading Spinner -->
+<div id="loading-spinner" class="htmx-indicator fixed top-4 right-4 z-50">
+    <div class="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg">
+        <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span class="text-sm font-medium">Carregando...</span>
+    </div>
+</div>
