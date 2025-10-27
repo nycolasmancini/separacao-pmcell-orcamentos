@@ -75,25 +75,47 @@
 </div>
 
 {% elif item.em_compra %}
-<!-- Item EM COMPRA (Laranja) - Fase 23 -->
-<div class="item-container border border-orange-200 rounded-lg p-4 bg-orange-50/30 transition-all duration-300"
+<!-- Item EM COMPRA (Laranja/Azul) - Fase 23 + Fase 28 -->
+<div class="item-container border {% if item.pedido_realizado %}border-blue-200{% else %}border-orange-200{% endif %} rounded-lg p-4 {% if item.pedido_realizado %}bg-blue-50/30{% else %}bg-orange-50/30{% endif %} transition-all duration-300"
      id="item-{{ item.id }}">
     <div class="flex items-start justify-between">
         <div class="flex-1">
             <div class="flex items-center space-x-3">
-                <!-- Checkbox (desabilitado quando em compra) -->
+                <!-- Checkbox (Fase 28: habilitado se pedido_realizado=True) -->
                 <div class="flex-shrink-0">
+                    {% if item.pedido_realizado %}
+                    <!-- Checkbox HABILITADO - Produto comprado chegou -->
+                    <input
+                        type="checkbox"
+                        id="checkbox-item-{{ item.id }}"
+                        hx-post="{% url 'separar_item' pedido.id item.id %}"
+                        hx-trigger="change"
+                        hx-target="#item-{{ item.id }}"
+                        hx-swap="outerHTML swap:300ms"
+                        hx-indicator="#loading-item-{{ item.id }}"
+                        class="w-5 h-5 text-blue-600 border-blue-300 rounded focus:ring-blue-500 cursor-pointer hover:border-blue-400 transition-colors"
+                    />
+                    <!-- Indicador de Loading -->
+                    <div id="loading-item-{{ item.id }}" class="htmx-indicator">
+                        <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </div>
+                    {% else %}
+                    <!-- Checkbox DESABILITADO - Aguardando compra -->
                     <input
                         type="checkbox"
                         disabled
                         class="w-5 h-5 text-orange-600 border-orange-300 rounded focus:ring-orange-500 cursor-not-allowed opacity-75"
                     />
+                    {% endif %}
                 </div>
 
                 <!-- Ícone -->
                 <div class="flex-shrink-0">
-                    <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                        <svg class="w-6 h-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="w-10 h-10 {% if item.pedido_realizado %}bg-blue-100{% else %}bg-orange-100{% endif %} rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 {% if item.pedido_realizado %}text-blue-600{% else %}text-orange-600{% endif %}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                         </svg>
                     </div>
@@ -108,19 +130,30 @@
                         Código: {{ item.produto.codigo }} | Qtd: {{ item.quantidade_solicitada }}
                     </p>
                     {% if item.enviado_para_compra_por %}
-                    <p class="text-xs text-orange-600 mt-1">
+                    <p class="text-xs {% if item.pedido_realizado %}text-blue-600{% else %}text-orange-600{% endif %} mt-1">
                         📦 Enviado para compra por {{ item.enviado_para_compra_por.nome }} em {{ item.enviado_para_compra_em|date:"d/m/Y H:i" }}
+                    </p>
+                    {% endif %}
+                    {% if item.pedido_realizado and item.realizado_por %}
+                    <p class="text-xs text-blue-600 mt-1 font-medium">
+                        ✓ Pedido realizado por {{ item.realizado_por.nome }} em {{ item.realizado_em|date:"d/m/Y H:i" }}
                     </p>
                     {% endif %}
                 </div>
             </div>
         </div>
 
-        <!-- Badge Aguardando Compra -->
+        <!-- Badge (muda cor se pedido realizado) -->
         <div class="ml-4">
+            {% if item.pedido_realizado %}
+            <span class="inline-flex items-center px-2.5 py-1.5 rounded-md text-xs font-medium bg-blue-100 text-blue-800 border border-blue-300">
+                ✓ Já comprado
+            </span>
+            {% else %}
             <span class="inline-flex items-center px-2.5 py-1.5 rounded-md text-xs font-medium bg-orange-100 text-orange-800 border border-orange-300">
                 📦 Aguardando Compra
             </span>
+            {% endif %}
         </div>
     </div>
 </div>

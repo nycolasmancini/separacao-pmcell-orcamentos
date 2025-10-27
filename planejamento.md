@@ -578,16 +578,16 @@ src/
 - **Status**: 100% completo
 
 ### 4.2 Fase Atual
-**Fase 26: Criar View do Painel de Compras**
+**Fase 29: Configurar Django Channels e WebSockets**
 
-Próxima fase: Painel exclusivo para a compradora visualizar itens marcados para compra.
+Próxima fase: Configurar infraestrutura de WebSockets para atualização em tempo real do dashboard.
 
 ### 4.3 Progresso Geral
 ```
-Progresso: 25/35 fases concluídas (71.4%)
-Testes: 72 passando (todas as fases até Fase 25) ✅
-Validações: 100% (Fase 25: 8/8 testes GREEN)
-Última atualização: 27/01/2025 - Fase 25 concluída com sucesso
+Progresso: 28/35 fases concluídas (80.0%)
+Testes: 85 passando (todas as fases até Fase 28) ✅
+Validações: 100% (Fase 28: 7/7 testes GREEN)
+Última atualização: 27/10/2025 - Fase 28 concluída com sucesso
 ```
 
 ---
@@ -1930,15 +1930,15 @@ def test_finalizar_pedido_calcula_tempo_total(client, logged_in_user):
 ### 🛒 GRUPO 7: PAINEL DE COMPRAS (Fases 26-28)
 
 #### Fase 26: Criar View do Painel de Compras
-**Status**: ⏳ Pendente
+**Status**: ✅ Concluída
 **Objetivo**: Listar itens enviados para compra
 
 **Tarefas**:
-- [ ] Criar view `PainelComprasView`
-- [ ] Buscar todos os `ItemCompra` (status: aguardando compra)
-- [ ] Agrupar por pedido
-- [ ] Exibir: produto, quantidade, pedido relacionado
-- [ ] Template `painel_compras.html`
+- [x] Criar view `PainelComprasView`
+- [x] Buscar todos os `ItemCompra` (status: aguardando compra)
+- [x] Agrupar por pedido
+- [x] Exibir: produto, quantidade, pedido relacionado
+- [x] Template `painel_compras.html`
 
 **Design**:
 ```
@@ -1962,90 +1962,123 @@ def test_finalizar_pedido_calcula_tempo_total(client, logged_in_user):
 └────────────────────────────────────────┘
 ```
 
+**Implementação**:
+- View: `backend/core/presentation/web/views.py` (PainelComprasView)
+- Template: `backend/templates/painel_compras.html`
+- URL: `path('compras/', PainelComprasView.as_view(), name='painel_compras')`
+- Navegação: Botão "🛒 Painel de Compras" no dashboard (visível apenas para COMPRADORA)
+- Testes: `backend/tests/test_fase26_painel_compras.py` (6 testes)
+
 **Validação**:
-- [ ] Painel renderiza
-- [ ] Itens agrupados corretamente
-- [ ] Testes passam
+- [x] Painel renderiza com status 200
+- [x] Itens com em_compra=True aparecem
+- [x] Itens sem em_compra NÃO aparecem
+- [x] Agrupamento por pedido correto
+- [x] Metadados (enviado por, horário) exibidos
+- [x] Template contém elementos esperados
+- [x] 6/6 testes GREEN ✅
 
 ---
 
 #### Fase 27: Implementar Checkbox "Pedido Realizado"
-**Status**: ⏳ Pendente
+**Status**: ✅ Concluída
 **Objetivo**: Compradora marca quando pedido foi feito
 
 **Tarefas**:
-- [ ] Checkbox funcional com HTMX
-- [ ] Endpoint `POST /compras/{item_id}/marcar-realizado/`
-- [ ] Atualizar status do `ItemCompra`
-- [ ] Badge do item muda de cor (laranja → azul)
-- [ ] Texto muda: "Aguardando Compra" → "Já comprado"
+- [x] Adicionar campos ao modelo ItemPedido (pedido_realizado, realizado_por, realizado_em)
+- [x] Criar e aplicar migration (0006)
+- [x] Implementar método marcar_realizado() no modelo
+- [x] Checkbox funcional com HTMX
+- [x] Endpoint `POST /compras/itens/{item_id}/marcar-realizado/`
+- [x] View MarcarPedidoRealizadoView com validação de permissão (apenas COMPRADORA)
+- [x] Template parcial badge_status_compra.html para atualização HTMX
+- [x] Badge do item muda de cor (laranja → azul)
+- [x] Texto muda: "Aguardando Compra" → "Já comprado"
+- [x] Logging completo de ações
+
+**Implementação**:
+- Modelo: `backend/core/models.py` (ItemPedido com novos campos)
+- View: `backend/core/presentation/web/views.py` (MarcarPedidoRealizadoView)
+- Template Principal: `backend/templates/painel_compras.html` (checkbox com HTMX)
+- Template Parcial: `backend/templates/partials/badge_status_compra.html` (badge dinâmico)
+- URL: `path('compras/itens/<int:item_id>/marcar-realizado/', MarcarPedidoRealizadoView.as_view(), name='marcar_realizado')`
+- Testes: `backend/tests/test_fase27_marcar_realizado.py` (7 testes)
+- Migration: `core/migrations/0006_itempedido_pedido_realizado_itempedido_realizado_em_and_more.py`
 
 **Testes**:
 ```python
-def test_marcar_pedido_como_realizado(client, logged_in_user):
-    """Testa marcação de pedido realizado"""
-    item_compra = criar_item_compra()
-
-    response = client.post(
-        f'/compras/{item_compra.id}/marcar-realizado/',
-        HTTP_HX_REQUEST='true'
-    )
-
-    item_compra.refresh_from_db()
-    assert item_compra.pedido_realizado is True
-    assert item_compra.realizado_por == logged_in_user
-
-def test_badge_muda_quando_pedido_realizado(client, logged_in_user):
-    """Testa mudança visual do badge"""
-    item_compra = criar_item_compra()
-    item_compra.marcar_realizado(logged_in_user)
-
-    response = client.get('/compras/')
-
-    assert 'Já comprado' in response.content.decode()
-    assert 'bg-blue' in response.content.decode()  # Cor azul
+# 7 testes implementados e passando (GREEN ✅)
+def test_marcar_item_como_realizado()  # Testa POST e atualização do item
+def test_badge_muda_quando_pedido_realizado()  # Valida mudança visual
+def test_apenas_compradora_pode_marcar()  # Valida permissões (403)
+def test_item_realizado_aparece_diferente()  # Valida badge azul
+def test_checkbox_funciona_com_htmx()  # Valida resposta parcial HTMX
+def test_metadados_realizado_salvos()  # Valida usuário e timestamp
+def test_metodo_marca_item_corretamente()  # Testa método do modelo
 ```
 
 **Validação**:
-- [ ] Checkbox funcional
-- [ ] Status atualiza
-- [ ] Badge muda visual
-- [ ] Testes passam
+- [x] Checkbox funcional com HTMX (sem reload de página)
+- [x] Status atualiza corretamente no banco
+- [x] Badge muda visual (laranja → azul)
+- [x] Metadados salvos (realizado_por, realizado_em)
+- [x] Apenas COMPRADORA pode marcar (validação de permissão)
+- [x] Testes passam (7/7 testes GREEN ✅)
+- [x] TDD rigoroso seguido (RED → GREEN → REFACTOR)
+- [x] Logging implementado
 
 ---
 
 #### Fase 28: Implementar Checkbox "Produto Chegou" (na Tela de Separação)
-**Status**: ⏳ Pendente
+**Status**: ✅ Concluída
 **Objetivo**: Separador marca quando produto comprado chegou
 
 **Tarefas**:
-- [ ] Na tela de detalhe do pedido, item com badge "Já comprado" tem checkbox habilitado
-- [ ] Separador marca checkbox quando produto chegar
-- [ ] Item é marcado como separado
-- [ ] Badge removido (ou muda para "✅ Separado")
+- [x] Na tela de detalhe do pedido, item com badge "Já comprado" tem checkbox habilitado
+- [x] Checkbox condicional: habilitado se `pedido_realizado=True`, desabilitado se `False`
+- [x] Separador marca checkbox quando produto chegar
+- [x] Item é marcado como separado via endpoint existente (SepararItemView)
+- [x] Badge muda: laranja "Aguardando Compra" → azul "Já comprado" → verde "Separado"
+- [x] Item move da seção "Não Separados" para "Separados"
+- [x] Progresso do pedido é atualizado automaticamente
+
+**Implementação**:
+- Template: `backend/templates/partials/_item_pedido.html` (linhas 77-159)
+- Lógica condicional: `{% if item.pedido_realizado %}` habilita checkbox com HTMX
+- View: Reutiliza `SepararItemView` existente (nenhuma mudança necessária)
+- Cores dinâmicas: Laranja (aguardando) → Azul (comprado) → Verde (separado)
+- Testes: `backend/tests/test_fase28_produto_chegou.py` (7 testes)
 
 **Testes**:
 ```python
-def test_marcar_item_comprado_quando_chega(client, logged_in_user):
-    """Testa marcação de item quando produto comprado chega"""
-    item = criar_item_em_compra()
-    item.marcar_pedido_realizado()
-
-    response = client.post(
-        f'/pedidos/{item.pedido.id}/itens/{item.id}/separar/',
-        HTTP_HX_REQUEST='true'
-    )
-
-    item.refresh_from_db()
-    assert item.separado is True
-    assert item.separado_por == logged_in_user
+# 7 testes implementados e passando (GREEN ✅)
+def test_checkbox_habilitado_para_item_com_pedido_realizado()  # Valida checkbox habilitado
+def test_checkbox_desabilitado_para_item_em_compra_sem_pedido()  # Valida checkbox desabilitado
+def test_marcar_item_quando_produto_chega()  # Testa POST e atualização
+def test_item_vai_para_secao_separados()  # Valida mudança de seção
+def test_badge_muda_para_separado()  # Valida mudança visual
+def test_progresso_atualizado()  # Valida atualização de progresso
+def test_fluxo_completo_produto_faltante()  # Testa fluxo E2E completo
 ```
 
 **Validação**:
-- [ ] Checkbox habilitado após compra
-- [ ] Marcação funciona
-- [ ] Item vai para seção "Separados"
-- [ ] Testes passam
+- [x] Checkbox habilitado apenas quando `pedido_realizado=True`
+- [x] Checkbox desabilitado quando `pedido_realizado=False`
+- [x] Marcação funciona via HTMX (POST para /separar/)
+- [x] Item vai para seção "Separados" após marcar
+- [x] Badge muda de azul para verde
+- [x] Progresso do pedido atualiza corretamente
+- [x] Testes passam (7/7 testes GREEN ✅)
+- [x] TDD rigoroso seguido (RED → GREEN)
+- [x] Nenhuma mudança em models, views ou URLs (reutiliza infraestrutura)
+
+**Fluxo Completo Produto Faltante**:
+1. Separador descobre falta → marca para compra (Fase 23)
+2. Item aparece no Painel de Compras com badge laranja (Fase 26)
+3. Compradora marca "Pedido Realizado" → badge azul (Fase 27)
+4. **[FASE 28]** Item volta à tela de separação com checkbox **habilitado**
+5. Produto chega → Separador marca checkbox
+6. Item move para "Separados" e progresso atualiza ✅
 
 ---
 
@@ -2626,3 +2659,60 @@ Quando estiver pronto, diga: "Iniciar Fase 13" e o Claude começará o desenvolv
 #### Próxima Fase:
 **Fase 19**: Implementar Ordenação e Paginação no Dashboard
 
+---
+
+## ✅ FASE 28 CONCLUÍDA (27/10/2025)
+
+### Implementação: Checkbox "Produto Chegou" (Fase 28)
+
+**Status**: ✅ 100% completo
+
+#### Resumo:
+Implementação da funcionalidade que permite aos separadores marcarem produtos comprados quando chegam, habilitando o checkbox automaticamente após a compradora marcar como "pedido realizado".
+
+#### Arquivos Criados/Modificados:
+1. **NOVO**: `backend/tests/test_fase28_produto_chegou.py` - 7 testes (100% passando)
+2. **EDITADO**: `backend/templates/partials/_item_pedido.html` - Linhas 77-159 (checkbox condicional)
+3. **EDITADO**: `planejamento.md` - Status atualizado (Fase 28 concluída, 80% progresso)
+
+#### Funcionalidades Implementadas:
+- ✅ Checkbox condicional: habilitado se `pedido_realizado=True`, desabilitado caso contrário
+- ✅ Badge dinâmico: Laranja "Aguardando Compra" → Azul "Já comprado" → Verde "Separado"
+- ✅ Cores adaptativas: item muda de cor conforme status (laranja/azul/verde)
+- ✅ Integração HTMX: checkbox envia POST sem reload de página
+- ✅ Reutilização de código: usa endpoint `separar_item` existente
+- ✅ Item move automaticamente para seção "Separados"
+- ✅ Progresso do pedido atualiza em tempo real
+
+#### Testes:
+- **Total de testes do projeto**: 85 (passando)
+- **Testes da Fase 28**: 7 (100% passando)
+  1. Checkbox habilitado para item com pedido realizado
+  2. Checkbox desabilitado para item sem pedido realizado
+  3. Marcação de item quando produto chega
+  4. Item move para seção "Separados"
+  5. Badge muda para "Separado"
+  6. Progresso do pedido é atualizado
+  7. Fluxo completo (E2E: marcar compra → pedido realizado → produto chegou)
+
+#### TDD Rigoroso Seguido:
+1. ✅ **RED**: 7 testes criados (1 falhando, 6 passando por reutilização)
+2. ✅ **GREEN**: Template modificado (todos os 7 testes passando)
+3. ✅ **VALIDAÇÃO**: Fases 26, 27 e 28 testadas juntas (20 testes, 100% passando)
+
+#### Validações Implementadas:
+- Lógica condicional: `{% if item.pedido_realizado %}` no template
+- Visual feedback: cores e ícones adaptativos (laranja/azul/verde)
+- UX otimizada: checkbox só habilitado quando faz sentido (produto comprado)
+- Informações completas: mostra quem enviou para compra e quem realizou pedido
+
+#### Fluxo Completo Produto Faltante:
+1. 📦 Separador marca item para compra (Fase 23)
+2. 🛒 Item aparece no Painel de Compras (Fase 26)
+3. ✓ Compradora marca "Pedido Realizado" (Fase 27)
+4. ✅ **[FASE 28]** Checkbox habilitado na tela de separação
+5. 📥 Produto chega → Separador marca checkbox
+6. ✓ Item separado e progresso atualizado
+
+#### Próxima Fase:
+**Fase 29**: Configurar Django Channels e WebSockets para atualização em tempo real
