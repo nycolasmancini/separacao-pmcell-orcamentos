@@ -19,6 +19,16 @@ from typing import List, Optional
 from core.domain.pedido.value_objects import Logistica, Embalagem, StatusPedido
 from core.domain.produto.entities import Produto
 
+# Import timezone utilities
+try:
+    from django.utils import timezone as django_tz
+    def now_with_tz():
+        return django_tz.now()
+except ImportError:
+    # Fallback se não estiver em contexto Django
+    def now_with_tz():
+        return datetime.now()
+
 logger = logging.getLogger(__name__)
 
 
@@ -94,7 +104,7 @@ class ItemPedido:
         self.separado = True
         self.quantidade_separada = self.quantidade_solicitada
         self.separado_por = usuario
-        self.separado_em = datetime.now()
+        self.separado_em = now_with_tz()
 
         logger.info(
             f"Item {self.id} (produto {self.produto.codigo}) marcado como separado "
@@ -132,7 +142,7 @@ class ItemPedido:
 
         self.em_compra = True
         self.enviado_para_compra_por = usuario
-        self.enviado_para_compra_em = datetime.now()
+        self.enviado_para_compra_em = now_with_tz()
 
         logger.info(
             f"Item {self.id} (produto {self.produto.codigo}) marcado para compra "
@@ -175,8 +185,8 @@ class Pedido:
     id: Optional[int] = None
     status: StatusPedido = StatusPedido.EM_SEPARACAO
     observacoes: Optional[str] = None
-    criado_em: datetime = field(default_factory=datetime.now)
-    data_inicio: datetime = field(default_factory=datetime.now)
+    criado_em: datetime = field(default_factory=now_with_tz)
+    data_inicio: datetime = field(default_factory=now_with_tz)
     data_finalizacao: Optional[datetime] = None
 
     def __post_init__(self):
@@ -275,7 +285,7 @@ class Pedido:
 
         Chamado automaticamente no __post_init__, mas pode ser usado para reiniciar.
         """
-        self.data_inicio = datetime.now()
+        self.data_inicio = now_with_tz()
         logger.info(f"Cronômetro iniciado para pedido {self.numero_orcamento}")
 
     def finalizar(self, usuario: str) -> None:
@@ -294,7 +304,7 @@ class Pedido:
             )
 
         self.status = StatusPedido.FINALIZADO
-        self.data_finalizacao = datetime.now()
+        self.data_finalizacao = now_with_tz()
 
         tempo_total = (self.data_finalizacao - self.data_inicio).total_seconds() / 60
 

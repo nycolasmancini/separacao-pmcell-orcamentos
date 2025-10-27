@@ -1058,3 +1058,130 @@ class SubstituirItemView(View):
                 'pedido': item.pedido
             }
         )
+
+
+class FinalizarPedidoView(View):
+    """
+    View HTMX para finalizar pedido quando progresso = 100% (Fase 25).
+
+    Endpoints:
+        GET /pedidos/<pedido_id>/finalizar/ - Retorna modal de confirmação HTML
+        POST /pedidos/<pedido_id>/finalizar/ - Processa finalização
+
+    Esta view permite finalizar um pedido quando todos os itens foram separados,
+    mudando o status para FINALIZADO e registrando o tempo total.
+
+    Methods:
+        get: Retorna modal HTML de confirmação
+        post: Finaliza pedido e redireciona para dashboard
+    """
+
+    @method_decorator(login_required)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def get(self, request, pedido_id):
+        """
+        Retorna o modal HTML de confirmação (HTMX).
+
+        Args:
+            request: HttpRequest
+            pedido_id: ID do pedido a ser finalizado
+
+        Returns:
+            HttpResponse: Modal HTML de confirmação
+        """
+        from core.models import Pedido as PedidoModel
+        from django.http import HttpResponse
+
+        try:
+            pedido = PedidoModel.objects.select_related('vendedor').prefetch_related(
+                'itens'
+            ).get(id=pedido_id)
+        except PedidoModel.DoesNotExist:
+            return HttpResponse("Pedido não encontrado", status=404)
+
+        # Calcular tempo decorrido
+        if pedido.data_inicio:
+            from django.utils import timezone
+            tempo_decorrido = (timezone.now() - pedido.data_inicio).total_seconds() / 60
+            tempo_decorrido_minutos = int(tempo_decorrido)
+        else:
+            tempo_decorrido_minutos = 0
+
+        return render(
+            request,
+            'partials/_modal_finalizar.html',
+            {
+                'pedido': pedido,
+                'tempo_decorrido_minutos': tempo_decorrido_minutos
+            }
+        )
+
+    def post(self, request, pedido_id):
+        """
+        Finaliza o pedido via HTMX.
+
+        Args:
+            request: HttpRequest (deve ter HX-Request header)
+            pedido_id: ID do pedido a ser finalizado
+
+        Returns:
+            HttpResponse: Redirect para dashboard ou erro
+        """
+        logger.info(
+            f"Finalizando pedido: pedido={pedido_id}, usuario={request.user.id}"
+        )
+
+        # Executar use case
+        from core.application.use_cases.finalizar_pedido import FinalizarPedidoUseCase
+        from core.infrastructure.persistence.repositories.pedido_repository import (
+            DjangoPedidoRepository
+        )
+
+        repository = DjangoPedidoRepository()
+        use_case = FinalizarPedidoUseCase(repository)
+
+        result = use_case.execute(
+            pedido_id=pedido_id,
+            usuario_nome=request.user.nome
+        )
+
+        if not result.sucesso:
+            logger.error(
+                f"Erro ao finalizar pedido {pedido_id}: {result.mensagem}"
+            )
+            messages.error(request, result.mensagem)
+
+            # Se for HTMX, retornar erro apropriado
+            if request.headers.get('HX-Request'):
+                return render(
+                    request,
+                    'partials/_erro.html',
+                    {'mensagem': result.mensagem},
+                    status=400
+                )
+
+            return redirect('detalhe_pedido', pedido_id=pedido_id)
+
+        logger.info(
+            f"Pedido {pedido_id} finalizado com sucesso. "
+            f"Tempo: {result.tempo_total_minutos:.1f} minutos"
+        )
+
+        # Mensagem de sucesso
+        messages.success(
+            request,
+            f'Pedido finalizado com sucesso! '
+            f'Tempo total: {result.tempo_total_minutos:.1f} minutos'
+        )
+
+        # Se for HTMX, usar header para redirect client-side
+        if request.headers.get('HX-Request'):
+            from django.http import HttpResponse
+            response = HttpResponse(status=200)
+            response['HX-Redirect'] = reverse('dashboard')
+            return response
+
+        # Redirect normal
+        return redirect('dashboard')

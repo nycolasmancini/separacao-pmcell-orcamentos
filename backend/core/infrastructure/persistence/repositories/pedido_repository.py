@@ -154,6 +154,7 @@ class DjangoPedidoRepository(PedidoRepositoryInterface):
                 pedido_django.embalagem = pedido.embalagem.value
                 pedido_django.status = pedido.status.value
                 pedido_django.observacoes = pedido.observacoes
+                pedido_django.data_inicio = pedido.data_inicio
                 pedido_django.data_finalizacao = pedido.data_finalizacao
             else:
                 # Criar novo pedido

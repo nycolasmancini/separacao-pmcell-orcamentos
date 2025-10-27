@@ -8,6 +8,7 @@ Fase 21: Detalhe do Pedido
 Fase 22: Separar Item
 Fase 23: Marcar para Compra
 Fase 24: Substituir Item
+Fase 25: Finalizar Pedido
 """
 from django.urls import path
 from core.presentation.web.views import (
@@ -18,7 +19,8 @@ from core.presentation.web.views import (
     DetalhePedidoView,
     SepararItemView,
     MarcarParaCompraView,
-    SubstituirItemView
+    SubstituirItemView,
+    FinalizarPedidoView
 )
 
 urlpatterns = [
@@ -30,4 +32,5 @@ urlpatterns = [
     path('pedidos/<int:pedido_id>/itens/<int:item_id>/separar/', SepararItemView.as_view(), name='separar_item'),
     path('pedidos/<int:pedido_id>/itens/<int:item_id>/marcar-compra/', MarcarParaCompraView.as_view(), name='marcar_compra'),
     path('pedidos/<int:pedido_id>/itens/<int:item_id>/substituir/', SubstituirItemView.as_view(), name='substituir_item'),
+    path('pedidos/<int:pedido_id>/finalizar/', FinalizarPedidoView.as_view(), name='finalizar_pedido'),
 ]

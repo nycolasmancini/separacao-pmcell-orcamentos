@@ -81,6 +81,24 @@
                     <div class="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-500" style="width: {{ progresso_percentual }}%"></div>
                 </div>
             </div>
+
+            <!-- Botão Finalizar Pedido (aparece apenas quando progresso = 100%) -->
+            {% if progresso_percentual == 100 %}
+            <div class="mt-6 flex justify-end">
+                <button
+                    type="button"
+                    hx-get="{% url 'finalizar_pedido' pedido_id=pedido.id %}"
+                    hx-target="body"
+                    hx-swap="beforeend"
+                    class="inline-flex items-center px-6 py-3 bg-green-600 text-white text-base font-semibold rounded-lg hover:bg-green-700 transition-colors shadow-lg hover:shadow-xl transform hover:scale-105 transition-transform"
+                >
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Finalizar Pedido
+                </button>
+            </div>
+            {% endif %}
         </div>
 
         <!-- Seção: Itens Não Separados -->

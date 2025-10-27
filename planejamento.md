@@ -555,16 +555,39 @@ src/
 - **Concluído**: FASE24_RESUMO.md criado com documentação completa
 - **Status**: 100% completo
 
-### 4.2 Fase Atual
-**Fase 25: Implementar Botão "Finalizar Pedido"**
+#### ✅ Fase 25: Implementar Botão "Finalizar Pedido"
+- **Concluído**: FinalizarPedidoResponseDTO criado (sucesso, pedido_id, status, tempo_total_minutos, mensagem)
+- **Concluído**: FinalizarPedidoUseCase implementado (core/application/use_cases/finalizar_pedido.py)
+- **Concluído**: Validação de progresso = 100% antes de finalizar
+- **Concluído**: Cálculo de tempo total de separação (data_finalizacao - data_inicio)
+- **Concluído**: Mudança de status para FINALIZADO
+- **Concluído**: Persistência via repositório (get_by_id, save)
+- **Concluído**: Template _modal_finalizar.html (modal HTMX com Alpine.js)
+- **Concluído**: Info box com tempo decorrido e informações do pedido
+- **Concluído**: FinalizarPedidoView (GET modal, POST finalização)
+- **Concluído**: Template detalhe_pedido.html atualizado (botão condicional quando progresso = 100%)
+- **Concluído**: Botão "Finalizar Pedido" com ícone verde e animação hover
+- **Concluído**: Rota 'finalizar_pedido' adicionada em core/urls.py
+- **Concluído**: DashboardView já filtra apenas pedidos EM_SEPARACAO (finalizados não aparecem)
+- **Concluído**: Redirect automático para dashboard após finalização (via HX-Redirect)
+- **Concluído**: Mensagens de sucesso/erro via Django messages
+- **Concluído**: Correção timezone-aware datetime (now_with_tz) na entidade Pedido
+- **Concluído**: 8 testes automatizados da Fase 25 (100% passando)
+- **Concluído**: TDD rigoroso seguido (RED → GREEN → REFACTOR)
+- **Concluído**: Validação final: 72 testes passando (8 novos da Fase 25 + 64 anteriores)
+- **Status**: 100% completo
 
-Próxima fase: Botão que aparece quando progresso = 100% para finalizar pedido.
+### 4.2 Fase Atual
+**Fase 26: Criar View do Painel de Compras**
+
+Próxima fase: Painel exclusivo para a compradora visualizar itens marcados para compra.
 
 ### 4.3 Progresso Geral
 ```
-Progresso: 24/35 fases concluídas (68.6%)
-Testes: 64 passando (todas as fases até Fase 24)
-Validações: 100% (Fase 24: 8/8 testes GREEN, 5/5 validações E2E GREEN)
+Progresso: 25/35 fases concluídas (71.4%)
+Testes: 72 passando (todas as fases até Fase 25) ✅
+Validações: 100% (Fase 25: 8/8 testes GREEN)
+Última atualização: 27/01/2025 - Fase 25 concluída com sucesso
 ```
 
 ---
@@ -1857,17 +1880,17 @@ def test_substituir_item_registra_dados_separador():
 ---
 
 #### Fase 25: Implementar Botão "Finalizar Pedido"
-**Status**: ⏳ Pendente
+**Status**: ✅ Concluída
 **Objetivo**: Finalizar pedido quando 100% separado
 
 **Tarefas**:
-- [ ] Botão aparece apenas quando progresso = 100%
-- [ ] Modal de confirmação
-- [ ] Use case `FinalizarPedidoUseCase`
-- [ ] Mudar status para `FINALIZADO`
-- [ ] Registrar tempo total de separação
-- [ ] Remover do dashboard (vai para histórico)
-- [ ] Animação de "slide out"
+- [x] Botão aparece apenas quando progresso = 100%
+- [x] Modal de confirmação
+- [x] Use case `FinalizarPedidoUseCase`
+- [x] Mudar status para `FINALIZADO`
+- [x] Registrar tempo total de separação
+- [x] Remover do dashboard (vai para histórico)
+- [x] Animação de "slide out"
 
 **Testes**:
 ```python
@@ -1896,11 +1919,11 @@ def test_finalizar_pedido_calcula_tempo_total(client, logged_in_user):
 ```
 
 **Validação**:
-- [ ] Botão aparece condicionalmente
-- [ ] Finalização funcional
-- [ ] Tempo calculado corretamente
-- [ ] Pedido sai do dashboard
-- [ ] Testes passam
+- [x] Botão aparece condicionalmente
+- [x] Finalização funcional
+- [x] Tempo calculado corretamente
+- [x] Pedido sai do dashboard
+- [x] Testes passam (8/8 testes aprovados)
 
 ---
 

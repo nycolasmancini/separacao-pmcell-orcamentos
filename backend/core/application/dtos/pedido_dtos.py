@@ -140,3 +140,74 @@ class CriarPedidoResponseDTO:
         if self.success:
             return f"CriarPedidoResponse(success=True, pedido={self.pedido.numero_orcamento})"
         return f"CriarPedidoResponse(success=False, error={self.error_message})"
+
+
+@dataclass
+class FinalizarPedidoResponseDTO:
+    """
+    DTO para response de finalização de pedido.
+
+    Attributes:
+        sucesso: Indica se a finalização foi bem-sucedida
+        pedido_id: ID do pedido finalizado
+        status: Status final do pedido (FINALIZADO se sucesso)
+        tempo_total_minutos: Tempo total de separação em minutos
+        mensagem: Mensagem descritiva do resultado
+
+    Examples:
+        >>> # Sucesso
+        >>> response = FinalizarPedidoResponseDTO(
+        ...     sucesso=True,
+        ...     pedido_id=123,
+        ...     status='FINALIZADO',
+        ...     tempo_total_minutos=45.5,
+        ...     mensagem='Pedido finalizado com sucesso'
+        ... )
+        >>> response.sucesso
+        True
+
+        >>> # Falha
+        >>> response = FinalizarPedidoResponseDTO(
+        ...     sucesso=False,
+        ...     pedido_id=123,
+        ...     status='EM_SEPARACAO',
+        ...     tempo_total_minutos=0.0,
+        ...     mensagem='Pedido não pode ser finalizado. Progresso: 33%'
+        ... )
+        >>> response.sucesso
+        False
+
+    Notes:
+        - tempo_total_minutos é calculado como: (data_finalizacao - data_inicio)
+        - Apenas pedidos com 100% de progresso podem ser finalizados
+    """
+
+    sucesso: bool
+    pedido_id: int
+    status: str
+    tempo_total_minutos: float
+    mensagem: str
+
+    def __post_init__(self):
+        """
+        Validações pós-inicialização.
+
+        Verifica:
+        - pedido_id é positivo
+        - tempo_total_minutos não é negativo
+        - mensagem não está vazia
+        """
+        if self.pedido_id <= 0:
+            raise ValueError("pedido_id deve ser positivo")
+
+        if self.tempo_total_minutos < 0:
+            raise ValueError("tempo_total_minutos não pode ser negativo")
+
+        if not self.mensagem:
+            raise ValueError("mensagem é obrigatória")
+
+    def __str__(self) -> str:
+        """Representação em string do DTO."""
+        if self.sucesso:
+            return f"FinalizarPedidoResponse(sucesso=True, pedido_id={self.pedido_id}, tempo={self.tempo_total_minutos:.1f}min)"
+        return f"FinalizarPedidoResponse(sucesso=False, pedido_id={self.pedido_id}, mensagem={self.mensagem})"
