@@ -255,6 +255,11 @@ class Pedido(models.Model):
             models.Index(fields=['numero_orcamento']),
             models.Index(fields=['status']),
             models.Index(fields=['-criado_em']),
+            # Fase 34: Índices de performance
+            models.Index(fields=['data_finalizacao']),  # Usado no HistoricoView
+            models.Index(fields=['vendedor']),  # Usado em filtros
+            models.Index(fields=['data_inicio']),  # Usado no Dashboard
+            models.Index(fields=['status', 'data_inicio']),  # Índice composto para Dashboard
         ]
 
     def __str__(self):
@@ -391,6 +396,24 @@ class ItemPedido(models.Model):
         verbose_name='Produto Substituto',
         help_text='Nome do produto que substituiu o original'
     )
+    pedido_realizado = models.BooleanField(
+        default=False,
+        verbose_name='Pedido Realizado',
+        help_text='Compradora marcou que o pedido foi realizado'
+    )
+    realizado_por = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='itens_pedido_realizado',
+        verbose_name='Pedido Realizado Por'
+    )
+    realizado_em = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name='Pedido Realizado Em'
+    )
 
     class Meta:
         verbose_name = 'Item do Pedido'
@@ -398,10 +421,27 @@ class ItemPedido(models.Model):
         ordering = ['id']
         indexes = [
             models.Index(fields=['pedido', 'separado']),
+            # Fase 34: Índices de performance
+            models.Index(fields=['em_compra']),  # Usado no PainelComprasView
+            models.Index(fields=['pedido_realizado']),  # Usado nas métricas
+            models.Index(fields=['separado_por']),  # Usado em filtros e métricas
         ]
 
     def __str__(self):
         return f"Item {self.id} - {self.produto.descricao} (Pedido {self.pedido.numero_orcamento})"
+
+    def marcar_realizado(self, usuario):
+        """
+        Marca o item como pedido realizado pela compradora.
+
+        Args:
+            usuario: Instância de Usuario (compradora)
+        """
+        from django.utils import timezone
+        self.pedido_realizado = True
+        self.realizado_por = usuario
+        self.realizado_em = timezone.now()
+        self.save()
 
     def to_entity(self):
         """

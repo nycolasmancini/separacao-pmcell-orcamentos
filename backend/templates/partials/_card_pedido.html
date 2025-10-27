@@ -2,7 +2,7 @@
 {# Este componente renderiza um card de pedido individual para o dashboard #}
 {# Recebe como contexto: pedido_data (dict com pedido, tempo_decorrido_minutos, progresso_percentual, itens_separados, total_itens, separadores) #}
 
-<div class="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 cursor-pointer border-l-4 border-blue-500">
+<div class="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 cursor-pointer border-l-4 border-blue-500" data-pedido-id="{{ pedido_data.pedido.id }}">
     <div class="p-6">
         <!-- Cabeçalho do Card -->
         <div class="flex justify-between items-start mb-4">
@@ -41,10 +41,10 @@
         <div class="mb-4">
             <div class="flex justify-between items-center mb-1">
                 <span class="text-xs font-medium text-gray-700">Progresso</span>
-                <span class="text-xs font-medium text-gray-700">{{ pedido_data.progresso_percentual }}%</span>
+                <span class="text-xs font-medium text-gray-700 progress-text">{{ pedido_data.progresso_percentual }}%</span>
             </div>
             <div class="w-full bg-gray-200 rounded-full h-2.5">
-                <div class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: {{ pedido_data.progresso_percentual }}%"></div>
+                <div class="progress-bar bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: {{ pedido_data.progresso_percentual }}%"></div>
             </div>
             <p class="text-xs text-gray-500 mt-1">{{ pedido_data.itens_separados }}/{{ pedido_data.total_itens }} itens separados</p>
         </div>

@@ -2,6 +2,58 @@
 
 {% block title %}Dashboard - Separação PMCELL{% endblock %}
 
+{% block extra_head %}
+<style>
+    /* Fase 30: Animações para atualizações em tempo real */
+
+    /* Animação de fade-in para novos cards */
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .fade-in-animation {
+        animation: fadeIn 0.5s ease-out;
+    }
+
+    /* Animação de fade-out para cards removidos */
+    @keyframes fadeOut {
+        from {
+            opacity: 1;
+            transform: scale(1);
+        }
+        to {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+    }
+
+    .fade-out-animation {
+        animation: fadeOut 0.5s ease-in forwards;
+    }
+
+    /* Animação de pulsação para atualização de progresso */
+    @keyframes progressPulse {
+        0%, 100% {
+            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+        }
+        50% {
+            box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+        }
+    }
+
+    .progress-update-animation {
+        animation: progressPulse 0.5s ease-out;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="min-h-screen bg-gray-50">
     <!-- Header -->
@@ -13,6 +65,22 @@
                     <p class="text-sm text-gray-600">Separação de Pedidos</p>
                 </div>
                 <div class="flex items-center space-x-4">
+                    <!-- Botão Painel de Compras (visível apenas para COMPRADORA) -->
+                    {% if usuario.tipo == 'COMPRADORA' %}
+                    <a href="{% url 'painel_compras' %}" class="inline-flex items-center px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 transition-colors shadow-sm">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                        🛒 Painel de Compras
+                    </a>
+                    {% endif %}
+                    <!-- Botão Métricas (Fase 33) -->
+                    <a href="{% url 'metricas' %}" class="inline-flex items-center px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors shadow-sm">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                        📊 Métricas
+                    </a>
                     <!-- Botão Criar Novo Pedido -->
                     <a href="{% url 'upload_orcamento' %}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,4 +178,177 @@
         {% include "partials/_pedidos_grid.html" %}
     </main>
 </div>
+
+{# Fase 30: WebSocket para Atualizações em Tempo Real #}
+<script>
+(function() {
+    'use strict';
+
+    // Configuração do WebSocket
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/dashboard/`;
+    let socket = null;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 10;
+    const reconnectDelay = 3000; // 3 segundos
+
+    // Conectar ao WebSocket
+    function connect() {
+        console.log('[WebSocket] Conectando...', wsUrl);
+
+        try {
+            socket = new WebSocket(wsUrl);
+
+            socket.onopen = function(e) {
+                console.log('[WebSocket] Conectado com sucesso!');
+                reconnectAttempts = 0;
+            };
+
+            socket.onmessage = function(event) {
+                console.log('[WebSocket] Mensagem recebida:', event.data);
+
+                try {
+                    const data = JSON.parse(event.data);
+                    handleWebSocketEvent(data);
+                } catch (error) {
+                    console.error('[WebSocket] Erro ao parsear mensagem:', error);
+                }
+            };
+
+            socket.onclose = function(event) {
+                console.log('[WebSocket] Conexão fechada:', event.code, event.reason);
+
+                // Tentar reconectar
+                if (reconnectAttempts < maxReconnectAttempts) {
+                    reconnectAttempts++;
+                    console.log(`[WebSocket] Tentando reconectar (${reconnectAttempts}/${maxReconnectAttempts})...`);
+                    setTimeout(connect, reconnectDelay);
+                } else {
+                    console.error('[WebSocket] Máximo de tentativas de reconexão atingido.');
+                }
+            };
+
+            socket.onerror = function(error) {
+                console.error('[WebSocket] Erro:', error);
+            };
+        } catch (error) {
+            console.error('[WebSocket] Erro ao criar conexão:', error);
+        }
+    }
+
+    // Manipular eventos WebSocket
+    function handleWebSocketEvent(data) {
+        const { type, pedido_id, progresso } = data;
+
+        switch (type) {
+            case 'pedido_criado':
+                handlePedidoCriado(pedido_id);
+                break;
+
+            case 'item_separado':
+                handleItemSeparado(pedido_id, progresso);
+                break;
+
+            case 'pedido_finalizado':
+                handlePedidoFinalizado(pedido_id);
+                break;
+
+            default:
+                console.warn('[WebSocket] Tipo de evento desconhecido:', type);
+        }
+    }
+
+    // Handler: Pedido Criado
+    function handlePedidoCriado(pedidoId) {
+        console.log('[WebSocket] Pedido criado:', pedidoId);
+
+        // Usar HTMX para carregar novo card via AJAX
+        const url = `/pedidos/${pedidoId}/card/`;
+        const container = document.querySelector('#pedidos-grid');
+
+        if (container) {
+            htmx.ajax('GET', url, {
+                target: '#pedidos-grid',
+                swap: 'afterbegin', // Adicionar no início da lista
+                select: 'div' // Selecionar apenas o card retornado
+            }).then(() => {
+                console.log('[WebSocket] Novo card adicionado ao dashboard');
+
+                // Adicionar animação fade-in ao novo card
+                const newCard = container.firstElementChild;
+                if (newCard && newCard.classList) {
+                    newCard.classList.add('fade-in-animation');
+                }
+            }).catch(error => {
+                console.error('[WebSocket] Erro ao carregar card:', error);
+            });
+        }
+    }
+
+    // Handler: Item Separado (atualizar progresso)
+    function handleItemSeparado(pedidoId, progresso) {
+        console.log('[WebSocket] Item separado - Pedido:', pedidoId, 'Progresso:', progresso + '%');
+
+        // Encontrar o card do pedido e atualizar barra de progresso
+        const cardSelector = `[data-pedido-id="${pedidoId}"]`;
+        const card = document.querySelector(cardSelector);
+
+        if (card) {
+            // Atualizar barra de progresso
+            const progressBar = card.querySelector('.progress-bar');
+            const progressText = card.querySelector('.progress-text');
+
+            if (progressBar) {
+                progressBar.style.width = progresso + '%';
+                progressBar.classList.add('progress-update-animation');
+
+                // Remover classe de animação após completar
+                setTimeout(() => {
+                    progressBar.classList.remove('progress-update-animation');
+                }, 500);
+            }
+
+            if (progressText) {
+                progressText.textContent = progresso + '%';
+            }
+
+            console.log('[WebSocket] Progresso atualizado');
+        } else {
+            console.warn('[WebSocket] Card do pedido não encontrado:', pedidoId);
+        }
+    }
+
+    // Handler: Pedido Finalizado (remover card)
+    function handlePedidoFinalizado(pedidoId) {
+        console.log('[WebSocket] Pedido finalizado:', pedidoId);
+
+        // Encontrar e remover o card do pedido
+        const cardSelector = `[data-pedido-id="${pedidoId}"]`;
+        const card = document.querySelector(cardSelector);
+
+        if (card) {
+            // Adicionar animação de fade-out
+            card.classList.add('fade-out-animation');
+
+            // Remover do DOM após animação
+            setTimeout(() => {
+                card.remove();
+                console.log('[WebSocket] Card removido do dashboard');
+            }, 500); // Duração da animação
+        } else {
+            console.warn('[WebSocket] Card do pedido não encontrado:', pedidoId);
+        }
+    }
+
+    // Iniciar conexão WebSocket ao carregar a página
+    connect();
+
+    // Fechar conexão ao sair da página
+    window.addEventListener('beforeunload', function() {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.close();
+        }
+    });
+})();
+</script>
 {% endblock %}

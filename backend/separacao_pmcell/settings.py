@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Django settings for separacao_pmcell project.
-Fase 7: Configuração mínima para testes de login
+Fase 29: Configuração com Django Channels e WebSockets
 """
 
 import os
@@ -22,15 +22,23 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 # Application definition
 
+import sys
+
 INSTALLED_APPS = [
+    'daphne',  # Fase 29: ASGI server (deve vir ANTES de django.contrib.staticfiles)
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'channels',  # Fase 29: WebSockets support
     'core',  # Nossa aplicação principal
 ]
+
+# Fase 34: Debug toolbar (apenas quando não estiver rodando testes)
+if 'test' not in sys.argv:
+    INSTALLED_APPS.insert(7, 'debug_toolbar')
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -42,6 +50,10 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'core.middleware.authentication.SessionTimeoutMiddleware',  # Middleware customizado - Fase 8
 ]
+
+# Fase 34: Debug toolbar middleware (apenas quando não estiver rodando testes)
+if 'test' not in sys.argv:
+    MIDDLEWARE.insert(7, 'debug_toolbar.middleware.DebugToolbarMiddleware')
 
 ROOT_URLCONF = 'separacao_pmcell.urls'
 
@@ -62,6 +74,9 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'separacao_pmcell.wsgi.application'
+
+# Fase 29: ASGI application (para WebSockets)
+ASGI_APPLICATION = 'separacao_pmcell.asgi.application'
 
 
 # Database
@@ -114,10 +129,34 @@ SESSION_COOKIE_AGE = 28800  # 8 hours in seconds
 SESSION_SAVE_EVERY_REQUEST = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
-# Cache (Redis será configurado depois)
+# Cache configuration
+# Fase 34: Migrado para Redis para performance
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-snowflake',
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/1',
+        'KEY_PREFIX': 'separacao_pmcell',
+        'TIMEOUT': 300,  # 5 minutos default
     }
+}
+
+# Fase 29: Channel Layers (Redis para WebSockets)
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
+        },
+    },
+}
+
+# Fase 34: Django Debug Toolbar
+INTERNAL_IPS = [
+    '127.0.0.1',
+    'localhost',
+]
+
+# Configurações adicionais do Debug Toolbar
+DEBUG_TOOLBAR_CONFIG = {
+    'SHOW_TOOLBAR_CALLBACK': lambda request: DEBUG and 'test' not in sys.argv,
 }

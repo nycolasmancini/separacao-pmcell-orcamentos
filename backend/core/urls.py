@@ -9,6 +9,10 @@ Fase 22: Separar Item
 Fase 23: Marcar para Compra
 Fase 24: Substituir Item
 Fase 25: Finalizar Pedido
+Fase 26: Painel de Compras
+Fase 27: Marcar Pedido Realizado
+Fase 30: Card Partial (WebSocket)
+Fase 31: Histórico de Pedidos
 """
 from django.urls import path
 from core.presentation.web.views import (
@@ -20,15 +24,25 @@ from core.presentation.web.views import (
     SepararItemView,
     MarcarParaCompraView,
     SubstituirItemView,
-    FinalizarPedidoView
+    FinalizarPedidoView,
+    PainelComprasView,
+    MarcarPedidoRealizadoView,
+    PedidoCardPartialView,
+    HistoricoView,
+    MetricasView
 )
 
 urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('dashboard/', DashboardView.as_view(), name='dashboard'),
+    path('historico/', HistoricoView.as_view(), name='historico'),  # Fase 31
+    path('metricas/', MetricasView.as_view(), name='metricas'),  # Fase 33
+    path('compras/', PainelComprasView.as_view(), name='painel_compras'),
+    path('compras/itens/<int:item_id>/marcar-realizado/', MarcarPedidoRealizadoView.as_view(), name='marcar_realizado'),
     path('pedidos/novo/', UploadOrcamentoView.as_view(), name='upload_orcamento'),
     path('pedidos/<int:pedido_id>/', DetalhePedidoView.as_view(), name='detalhe_pedido'),
+    path('pedidos/<int:pedido_id>/card/', PedidoCardPartialView.as_view(), name='pedido_card_partial'),  # Fase 30
     path('pedidos/<int:pedido_id>/itens/<int:item_id>/separar/', SepararItemView.as_view(), name='separar_item'),
     path('pedidos/<int:pedido_id>/itens/<int:item_id>/marcar-compra/', MarcarParaCompraView.as_view(), name='marcar_compra'),
     path('pedidos/<int:pedido_id>/itens/<int:item_id>/substituir/', SubstituirItemView.as_view(), name='substituir_item'),

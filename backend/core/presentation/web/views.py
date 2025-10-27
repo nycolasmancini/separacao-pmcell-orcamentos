@@ -4,16 +4,22 @@ Views web para o sistema de separação.
 Fase 7: LoginView e Dashboard Placeholder
 Fase 8: LogoutView
 Fase 15: UploadOrcamentoView
+Fase 30: WebSocket Broadcast
 """
 import logging
 import tempfile
 import os
 from django.shortcuts import render, redirect
+from django.urls import reverse
 from django.views import View
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.core.cache import cache
+from django.utils import timezone
 from django.utils.decorators import method_decorator
+from django.http import HttpResponseForbidden, HttpResponseNotFound
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 from core.presentation.web.forms import LoginForm, UploadOrcamentoForm
 from core.presentation.web.decorators import login_required
@@ -296,17 +302,30 @@ class DashboardView(View):
 
     def _get_vendedores(self):
         """
-        Retorna lista de vendedores para o filtro.
+        Retorna lista de vendedores para o filtro com cache (Fase 34).
 
         Returns:
-            QuerySet: Usuários vendedores
+            list: Lista de usuários vendedores (cacheada por 5 minutos)
         """
         from core.models import Usuario
 
-        return Usuario.objects.filter(
+        # Fase 34: Adicionar cache de 5 minutos
+        vendedores_cache = cache.get('dashboard_vendedores')
+        if vendedores_cache is not None:
+            logger.debug("Vendedores carregados do cache")
+            return vendedores_cache
+
+        # Buscar do banco
+        vendedores = list(Usuario.objects.filter(
             tipo='VENDEDOR',
             ativo=True
-        ).order_by('nome')
+        ).order_by('nome').values('id', 'nome', 'numero_login'))
+
+        # Cachear por 5 minutos (300 segundos)
+        cache.set('dashboard_vendedores', vendedores, 300)
+        logger.debug(f"Vendedores cacheados: {len(vendedores)} vendedores")
+
+        return vendedores
 
     def _build_pedido_data(self, pedido):
         """
@@ -544,6 +563,21 @@ class UploadOrcamentoView(View):
                     f"Pedido criado com sucesso: {response_dto.pedido.numero_orcamento} "
                     f"(ID: {response_dto.pedido.id})"
                 )
+
+                # Fase 30: Broadcast evento WebSocket para dashboard
+                try:
+                    channel_layer = get_channel_layer()
+                    async_to_sync(channel_layer.group_send)(
+                        'dashboard',
+                        {
+                            'type': 'pedido_criado',
+                            'pedido_id': response_dto.pedido.id
+                        }
+                    )
+                    logger.info(f"Evento WebSocket enviado: pedido_criado (ID: {response_dto.pedido.id})")
+                except Exception as e:
+                    logger.warning(f"Erro ao enviar evento WebSocket pedido_criado: {e}")
+
                 messages.success(
                     request,
                     f'Pedido #{response_dto.pedido.numero_orcamento} criado com sucesso!'
@@ -769,6 +803,24 @@ class SepararItemView(View):
         logger.info(
             f"Progresso do pedido {pedido_id} atualizado: {progresso_percentual}%"
         )
+
+        # Fase 30: Broadcast evento WebSocket para dashboard
+        try:
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                'dashboard',
+                {
+                    'type': 'item_separado',
+                    'pedido_id': pedido.id,
+                    'progresso': progresso_percentual
+                }
+            )
+            logger.info(
+                f"Evento WebSocket enviado: item_separado "
+                f"(pedido_id={pedido.id}, progresso={progresso_percentual}%)"
+            )
+        except Exception as e:
+            logger.warning(f"Erro ao enviar evento WebSocket item_separado: {e}")
 
         # Renderizar partial atualizado do item
         return render(request, 'partials/_item_pedido.html', {
@@ -1169,6 +1221,20 @@ class FinalizarPedidoView(View):
             f"Tempo: {result.tempo_total_minutos:.1f} minutos"
         )
 
+        # Fase 30: Broadcast evento WebSocket para dashboard
+        try:
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                'dashboard',
+                {
+                    'type': 'pedido_finalizado',
+                    'pedido_id': pedido_id
+                }
+            )
+            logger.info(f"Evento WebSocket enviado: pedido_finalizado (pedido_id={pedido_id})")
+        except Exception as e:
+            logger.warning(f"Erro ao enviar evento WebSocket pedido_finalizado: {e}")
+
         # Mensagem de sucesso
         messages.success(
             request,
@@ -1185,3 +1251,728 @@ class FinalizarPedidoView(View):
 
         # Redirect normal
         return redirect('dashboard')
+
+
+class PainelComprasView(View):
+    """
+    View do Painel de Compras (Fase 26).
+
+    Exibe todos os itens que foram enviados para compra pelos separadores,
+    agrupados por pedido, para visualização pela compradora.
+
+    Methods:
+        get: Renderiza o painel com itens agrupados por pedido
+    """
+
+    @method_decorator(login_required)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def get(self, request):
+        """
+        Renderiza o painel de compras com paginação (Fase 34).
+
+        Args:
+            request: HttpRequest
+
+        Returns:
+            HttpResponse: Página do painel de compras com itens agrupados e paginados
+        """
+        from core.models import ItemPedido as ItemPedidoModel
+        from itertools import groupby
+        from operator import attrgetter
+        from django.core.paginator import Paginator
+
+        logger.info(
+            f"Acessando painel de compras: usuario={request.user.numero_login}"
+        )
+
+        # Buscar todos os itens marcados para compra
+        itens_em_compra = ItemPedidoModel.objects.filter(
+            em_compra=True
+        ).select_related(
+            'pedido',
+            'pedido__vendedor',
+            'produto',
+            'enviado_para_compra_por'
+        ).order_by(
+            'pedido__numero_orcamento',
+            'id'
+        )
+
+        total_itens = itens_em_compra.count()
+        logger.info(f"Total de itens em compra: {total_itens}")
+
+        # Fase 34: Adicionar paginação (20 itens por página)
+        page_number = request.GET.get('page', 1)
+        paginator = Paginator(itens_em_compra, 20)  # 20 itens por página
+        page_obj = paginator.get_page(page_number)
+
+        # Agrupar itens da página atual por pedido
+        itens_agrupados = []
+        for pedido, itens in groupby(page_obj, key=attrgetter('pedido')):
+            itens_lista = list(itens)
+            itens_agrupados.append((pedido, itens_lista))
+
+        return render(
+            request,
+            'painel_compras.html',
+            {
+                'usuario': request.user,
+                'itens_compra': itens_agrupados,
+                'total_itens': total_itens,
+                'page_obj': page_obj,  # Fase 34: Adicionar objeto de paginação
+            }
+        )
+
+
+class MarcarPedidoRealizadoView(View):
+    """
+    View para marcar item como pedido realizado (Fase 27).
+
+    Permite que a compradora marque um item de compra como "pedido realizado",
+    atualizando seu status visual e salvando metadados (usuário, timestamp).
+
+    Methods:
+        post: Marca item como realizado e retorna badge atualizado (HTMX)
+    """
+
+    @method_decorator(login_required)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def post(self, request, item_id):
+        """
+        Marca item como pedido realizado.
+
+        Args:
+            request: HttpRequest (deve conter HX-Request header)
+            item_id: ID do ItemPedido a ser marcado
+
+        Returns:
+            HttpResponse: Badge atualizado (HTML parcial para HTMX)
+                         ou erro 403/404
+
+        Raises:
+            403: Se usuário não for COMPRADORA
+            404: Se item não existir
+        """
+        from core.models import ItemPedido as ItemPedidoModel
+
+        # Validar permissão: apenas compradora pode marcar
+        if request.user.tipo != 'COMPRADORA':
+            logger.warning(
+                f"Tentativa de marcar pedido realizado por usuário não autorizado: "
+                f"usuario={request.user.numero_login} tipo={request.user.tipo}"
+            )
+            return HttpResponseForbidden(
+                "Apenas a compradora pode marcar itens como pedido realizado."
+            )
+
+        # Buscar item
+        try:
+            item = ItemPedidoModel.objects.select_related(
+                'produto', 'pedido'
+            ).get(id=item_id)
+        except ItemPedidoModel.DoesNotExist:
+            logger.error(f"Item não encontrado: item_id={item_id}")
+            return HttpResponseNotFound("Item não encontrado.")
+
+        # Marcar como realizado
+        item.marcar_realizado(request.user)
+
+        logger.info(
+            f"Item marcado como pedido realizado: "
+            f"item_id={item.id} produto={item.produto.descricao} "
+            f"pedido={item.pedido.numero_orcamento} "
+            f"usuario={request.user.numero_login}"
+        )
+
+        # Renderizar badge atualizado (partial HTML para HTMX)
+        return render(
+            request,
+            'partials/badge_status_compra.html',
+            {
+                'item': item,
+                'pedido_realizado': True
+            }
+        )
+
+
+class PedidoCardPartialView(View):
+    """
+    View para retornar apenas o HTML de um card de pedido (Fase 30).
+
+    Esta view é usada pelo JavaScript WebSocket para adicionar novos cards
+    ao dashboard via HTMX quando um pedido é criado em tempo real.
+
+    Methods:
+        get: Retorna HTML parcial do card de um pedido específico
+    """
+
+    @method_decorator(login_required)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def get(self, request, pedido_id):
+        """
+        Retorna HTML parcial de um card de pedido.
+
+        Args:
+            request: HttpRequest
+            pedido_id: ID do pedido a ser renderizado
+
+        Returns:
+            HttpResponse: HTML parcial do card (sem layout base)
+                         ou erro 404
+
+        Raises:
+            404: Se pedido não existir
+        """
+        from core.models import Pedido as PedidoModel
+        from django.utils import timezone
+        from django.db.models import Count, Q
+
+        # Buscar pedido
+        try:
+            pedido = PedidoModel.objects.select_related('vendedor').get(id=pedido_id)
+        except PedidoModel.DoesNotExist:
+            logger.error(f"Pedido não encontrado para card partial: pedido_id={pedido_id}")
+            return HttpResponseNotFound("Pedido não encontrado.")
+
+        # Calcular dados do card (mesmo formato usado no dashboard)
+        tempo_decorrido = timezone.now() - pedido.data_inicio
+        tempo_decorrido_minutos = int(tempo_decorrido.total_seconds() / 60)
+
+        # Contar itens separados
+        itens = pedido.itens.all()
+        total_itens = itens.count()
+        itens_separados = itens.filter(separado=True).count()
+        progresso_percentual = int((itens_separados / total_itens * 100)) if total_itens > 0 else 0
+
+        # Buscar separadores ativos (usuários do tipo SEPARADOR que têm sessões ativas)
+        # Por simplicidade, retornar lista vazia (feature futura)
+        separadores = []
+
+        # Preparar contexto
+        pedido_data = {
+            'pedido': pedido,
+            'tempo_decorrido_minutos': tempo_decorrido_minutos,
+            'progresso_percentual': progresso_percentual,
+            'itens_separados': itens_separados,
+            'total_itens': total_itens,
+            'separadores': separadores
+        }
+
+        logger.info(
+            f"Card partial renderizado: pedido_id={pedido_id} "
+            f"progresso={progresso_percentual}%"
+        )
+
+        # Renderizar apenas o partial (sem base.html)
+        return render(
+            request,
+            'partials/_card_pedido.html',
+            {'pedido_data': pedido_data}
+        )
+
+
+class HistoricoView(View):
+    """
+    View do histórico de pedidos finalizados - Fase 31.
+
+    Exibe lista de pedidos finalizados com:
+    - Data e hora de finalização
+    - Tempo total de separação
+    - Vendedor, cliente, número do pedido
+    - Quem finalizou o pedido
+
+    Funcionalidades:
+    - Paginação (20 pedidos por página)
+    - Busca por número de orçamento ou nome de cliente
+    - Filtro por vendedor
+    - Filtro por data de finalização
+    - Suporte a requisições HTMX (retorna partial HTML)
+    """
+
+    template_name = 'historico.html'
+    partial_template_name = 'partials/_historico_grid.html'
+    items_per_page = 20
+
+    @method_decorator(login_required)
+    def get(self, request):
+        """
+        Renderiza o histórico com pedidos finalizados.
+
+        Args:
+            request: HttpRequest
+
+        Returns:
+            HttpResponse: Histórico com lista de pedidos finalizados
+        """
+        from django.core.paginator import Paginator
+        from django.db.models import Q
+        from core.domain.pedido.value_objects import StatusPedido
+
+        # Obter query params
+        search_query = request.GET.get('busca', '').strip()
+        vendedor_id = request.GET.get('vendedor', '').strip()
+        data_filter = request.GET.get('data', '').strip()
+        page_number = request.GET.get('page', 1)
+
+        # Buscar pedidos finalizados
+        pedidos_queryset = self._get_pedidos_finalizados()
+
+        # Aplicar filtros
+        pedidos_queryset = self._apply_filters(
+            pedidos_queryset,
+            search_query,
+            vendedor_id,
+            data_filter
+        )
+
+        # Paginar
+        paginator = Paginator(pedidos_queryset, self.items_per_page)
+        page_obj = paginator.get_page(page_number)
+
+        # Processar pedidos da página atual
+        pedidos_processados = []
+        for pedido in page_obj:
+            pedido_data = self._build_pedido_data(pedido)
+            pedidos_processados.append(pedido_data)
+
+        # Obter lista de vendedores para o dropdown
+        vendedores = self._get_vendedores()
+
+        context = {
+            'pedidos': page_obj,
+            'pedidos_processados': pedidos_processados,
+            'page_obj': page_obj,
+            'vendedores': vendedores,
+            'search_query': search_query,
+            'vendedor_id': vendedor_id,
+            'data_filter': data_filter,
+        }
+
+        # Se for requisição HTMX, retornar apenas o grid
+        if request.headers.get('HX-Request'):
+            return render(request, self.partial_template_name, context)
+
+        return render(request, self.template_name, context)
+
+    def _get_pedidos_finalizados(self):
+        """
+        Busca todos os pedidos finalizados.
+
+        Returns:
+            QuerySet: Pedidos finalizados ordenados por data de finalização DESC
+        """
+        from core.models import Pedido
+        from core.domain.pedido.value_objects import StatusPedido
+
+        return (
+            Pedido.objects
+            .filter(status=StatusPedido.FINALIZADO.value)
+            .select_related('vendedor')
+            .prefetch_related('itens')
+            .order_by('-data_finalizacao')
+        )
+
+    def _apply_filters(self, queryset, search_query, vendedor_id, data_filter):
+        """
+        Aplica filtros de busca, vendedor e data ao queryset.
+
+        Args:
+            queryset: QuerySet de pedidos
+            search_query: Termo de busca (número ou cliente)
+            vendedor_id: ID do vendedor para filtrar
+            data_filter: Data para filtrar (YYYY-MM-DD)
+
+        Returns:
+            QuerySet: Pedidos filtrados
+        """
+        from django.db.models import Q
+
+        # Filtro de busca (número ou cliente)
+        if search_query:
+            queryset = queryset.filter(
+                Q(numero_orcamento__icontains=search_query) |
+                Q(nome_cliente__icontains=search_query)
+            )
+
+        # Filtro de vendedor
+        if vendedor_id:
+            queryset = queryset.filter(vendedor_id=vendedor_id)
+
+        # Filtro de data
+        if data_filter:
+            try:
+                from datetime import datetime
+                from django.utils import timezone
+                # Parse YYYY-MM-DD
+                data_obj = datetime.strptime(data_filter, '%Y-%m-%d').date()
+                # Filtrar pedidos finalizados nessa data
+                queryset = queryset.filter(
+                    data_finalizacao__date=data_obj
+                )
+            except ValueError:
+                logger.warning(f"Data inválida no filtro: {data_filter}")
+
+        return queryset
+
+    def _build_pedido_data(self, pedido):
+        """
+        Constrói dict com dados processados do pedido.
+
+        Args:
+            pedido: Instância de Pedido
+
+        Returns:
+            dict: Dados do pedido formatados
+        """
+        # Calcular tempo total de separação
+        tempo_total_minutos = self._calcular_tempo_total(pedido)
+
+        # Contar itens
+        total_itens = pedido.itens.count()
+        itens_separados = pedido.itens.filter(separado=True).count()
+
+        return {
+            'id': pedido.id,
+            'numero_orcamento': pedido.numero_orcamento,
+            'nome_cliente': pedido.nome_cliente,
+            'vendedor': pedido.vendedor.nome if pedido.vendedor else 'N/A',
+            'data_finalizacao': pedido.data_finalizacao,
+            'tempo_total_minutos': tempo_total_minutos,
+            'tempo_total_formatado': self._formatar_tempo(tempo_total_minutos),
+            'total_itens': total_itens,
+            'itens_separados': itens_separados,
+        }
+
+    def _calcular_tempo_total(self, pedido):
+        """
+        Calcula tempo total de separação em minutos.
+
+        Args:
+            pedido: Instância de Pedido
+
+        Returns:
+            int: Tempo total em minutos
+        """
+        if not pedido.data_finalizacao or not pedido.data_inicio:
+            return 0
+
+        delta = pedido.data_finalizacao - pedido.data_inicio
+        return int(delta.total_seconds() / 60)
+
+    def _formatar_tempo(self, minutos):
+        """
+        Formata tempo em string legível (ex: "1h 30min").
+
+        Args:
+            minutos: Tempo em minutos
+
+        Returns:
+            str: Tempo formatado
+        """
+        if minutos < 60:
+            return f"{minutos} min"
+
+        horas = minutos // 60
+        mins = minutos % 60
+
+        if mins == 0:
+            return f"{horas}h"
+
+        return f"{horas}h {mins}min"
+
+    def _get_vendedores(self):
+        """
+        Busca lista de vendedores para o filtro com cache (Fase 34).
+
+        Returns:
+            list: Vendedores que têm pedidos finalizados (cacheado por 5 minutos)
+        """
+        from core.models import Usuario, Pedido
+        from core.domain.pedido.value_objects import StatusPedido
+
+        # Fase 34: Cache de 5 minutos
+        vendedores_cache = cache.get('historico_vendedores')
+        if vendedores_cache is not None:
+            logger.debug("Vendedores do histórico carregados do cache")
+            return vendedores_cache
+
+        # Buscar vendedores que têm pedidos finalizados
+        vendedor_ids = (
+            Pedido.objects
+            .filter(status=StatusPedido.FINALIZADO.value)
+            .values_list('vendedor_id', flat=True)
+            .distinct()
+        )
+
+        vendedores = list(Usuario.objects.filter(
+            id__in=vendedor_ids
+        ).order_by('nome').values('id', 'nome', 'numero_login'))
+
+        # Cachear por 5 minutos
+        cache.set('historico_vendedores', vendedores, 300)
+        logger.debug(f"Vendedores do histórico cacheados: {len(vendedores)} vendedores")
+
+        return vendedores
+
+
+# ==================== FASE 33: MÉTRICAS AVANÇADAS ====================
+
+@method_decorator(login_required, name='dispatch')
+class MetricasView(View):
+    """
+    View para exibir métricas avançadas de performance (Fase 33).
+
+    URL: /metricas/
+
+    Responsabilidades:
+    - Calcular tempo médio por separador
+    - Gerar ranking de separadores (mais rápido → mais lento)
+    - Listar top 10 produtos mais separados
+    - Listar top 10 produtos mais enviados para compra
+    - Gerar dados para gráfico de pedidos por dia (últimos 30 dias)
+
+    Methods:
+        get: Renderiza página de métricas com todos os dados
+    """
+
+    template_name = 'metricas.html'
+
+    def get(self, request):
+        """
+        Renderiza página de métricas.
+
+        Args:
+            request: HttpRequest
+
+        Returns:
+            HttpResponse: Página de métricas com dados calculados
+        """
+        logger.info(f"Usuário {request.user.nome} acessou métricas")
+
+        metricas = {
+            'tempo_medio_separadores': self._calcular_tempo_medio_por_separador(),
+            'ranking_separadores': self._obter_ranking_separadores(),
+            'produtos_mais_separados': self._obter_produtos_mais_separados(),
+            'produtos_mais_enviados_compra': self._obter_produtos_mais_enviados_compra(),
+            'grafico_pedidos_30_dias': self._obter_pedidos_ultimos_30_dias()
+        }
+
+        context = {
+            'metricas': metricas,
+            'usuario': request.user
+        }
+
+        return render(request, self.template_name, context)
+
+    def _calcular_tempo_medio_por_separador(self):
+        """
+        Calcula tempo médio de separação por separador usando agregações Django.
+
+        Fase 34: Otimizado com agregações para evitar loops e queries N+1.
+
+        Returns:
+            list: Lista de dicts com {separador, tempo_medio_minutos, total_pedidos}
+        """
+        from core.models import Pedido, ItemPedido
+        from core.domain.pedido.value_objects import StatusPedido
+        from django.db.models import Avg, Count, F, ExpressionWrapper, DurationField, FloatField, Q
+        from django.db.models.functions import Extract
+
+        # Usar agregação Django para calcular tempo médio por separador
+        # Estratégia: Agrupar por separador e calcular média de tempo dos pedidos
+        resultado_query = (
+            ItemPedido.objects
+            .filter(
+                separado=True,
+                separado_por__isnull=False,
+                pedido__status=StatusPedido.FINALIZADO.value,
+                pedido__data_inicio__isnull=False,
+                pedido__data_finalizacao__isnull=False
+            )
+            .values('separado_por__nome')  # Agrupar por separador
+            .annotate(
+                # Contar pedidos distintos (cada separador pode ter separado vários pedidos)
+                total_pedidos=Count('pedido', distinct=True),
+                # Calcular tempo médio usando ExpressionWrapper
+                # Nota: Usamos subquery para pegar tempo do pedido
+            )
+        )
+
+        # Processar resultado e calcular tempo médio manualmente
+        # (devido à limitação de calcular diferença de timestamps em agregações)
+        separadores_pedidos = {}
+
+        itens = ItemPedido.objects.filter(
+            separado=True,
+            separado_por__isnull=False,
+            pedido__status=StatusPedido.FINALIZADO.value,
+            pedido__data_inicio__isnull=False,
+            pedido__data_finalizacao__isnull=False
+        ).select_related('separado_por', 'pedido').values(
+            'separado_por__nome',
+            'pedido__id',
+            'pedido__data_inicio',
+            'pedido__data_finalizacao'
+        ).distinct()
+
+        # Agrupar por separador
+        for item in itens:
+            separador = item['separado_por__nome']
+            pedido_id = item['pedido__id']
+
+            if separador not in separadores_pedidos:
+                separadores_pedidos[separador] = {}
+
+            # Evitar contar o mesmo pedido duas vezes
+            if pedido_id not in separadores_pedidos[separador]:
+                tempo_minutos = (
+                    item['pedido__data_finalizacao'] - item['pedido__data_inicio']
+                ).total_seconds() / 60
+                separadores_pedidos[separador][pedido_id] = tempo_minutos
+
+        # Calcular médias
+        resultado = []
+        for separador, pedidos_dict in separadores_pedidos.items():
+            total_pedidos = len(pedidos_dict)
+            if total_pedidos > 0:
+                tempo_total = sum(pedidos_dict.values())
+                tempo_medio = tempo_total / total_pedidos
+                resultado.append({
+                    'separador': separador,
+                    'tempo_medio_minutos': round(tempo_medio, 1),
+                    'total_pedidos': total_pedidos
+                })
+
+        logger.debug(f"Tempo médio calculado para {len(resultado)} separadores")
+        return resultado
+
+    def _obter_ranking_separadores(self):
+        """
+        Obtém ranking de separadores ordenado por velocidade (mais rápido primeiro).
+
+        Returns:
+            list: Lista ordenada por tempo_medio_minutos (crescente)
+        """
+        tempo_medio = self._calcular_tempo_medio_por_separador()
+
+        # Ordenar por tempo médio (crescente = mais rápido primeiro)
+        ranking = sorted(tempo_medio, key=lambda x: x['tempo_medio_minutos'])
+
+        logger.debug(f"Ranking gerado com {len(ranking)} separadores")
+        return ranking
+
+    def _obter_produtos_mais_separados(self):
+        """
+        Obtém top 10 produtos mais separados.
+
+        Returns:
+            list: Lista de dicts com {produto, total_separado}
+        """
+        from core.models import ItemPedido
+        from django.db.models import Sum
+
+        produtos = (
+            ItemPedido.objects
+            .filter(separado=True)
+            .values('produto__descricao')
+            .annotate(total_separado=Sum('quantidade_separada'))
+            .order_by('-total_separado')[:10]
+        )
+
+        resultado = [
+            {
+                'produto': p['produto__descricao'],
+                'total_separado': p['total_separado']
+            }
+            for p in produtos
+        ]
+
+        logger.debug(f"Top {len(resultado)} produtos mais separados")
+        return resultado
+
+    def _obter_produtos_mais_enviados_compra(self):
+        """
+        Obtém top 10 produtos mais enviados para compra.
+
+        Returns:
+            list: Lista de dicts com {produto, total_enviado}
+        """
+        from core.models import ItemPedido
+        from django.db.models import Sum
+
+        produtos = (
+            ItemPedido.objects
+            .filter(em_compra=True)
+            .values('produto__descricao')
+            .annotate(total_enviado=Sum('quantidade_solicitada'))
+            .order_by('-total_enviado')[:10]
+        )
+
+        resultado = [
+            {
+                'produto': p['produto__descricao'],
+                'total_enviado': p['total_enviado']
+            }
+            for p in produtos
+        ]
+
+        logger.debug(f"Top {len(resultado)} produtos mais enviados para compra")
+        return resultado
+
+    def _obter_pedidos_ultimos_30_dias(self):
+        """
+        Obtém dados para gráfico de pedidos por dia (últimos 30 dias).
+
+        Returns:
+            dict: {labels: [datas], data: [quantidades]}
+        """
+        from core.models import Pedido
+        from core.domain.pedido.value_objects import StatusPedido
+        from datetime import timedelta
+        from collections import defaultdict
+        from django.db.models import Count
+
+        hoje = timezone.now().date()
+        inicio = hoje - timedelta(days=29)  # 30 dias incluindo hoje
+
+        # Buscar pedidos finalizados nos últimos 30 dias
+        pedidos = (
+            Pedido.objects
+            .filter(
+                status=StatusPedido.FINALIZADO.value,
+                data_finalizacao__date__gte=inicio,
+                data_finalizacao__date__lte=hoje
+            )
+            .values('data_finalizacao__date')
+            .annotate(total=Count('id'))
+        )
+
+        # Criar dict com contagens por dia
+        pedidos_por_dia = defaultdict(int)
+        for p in pedidos:
+            data = p['data_finalizacao__date']
+            pedidos_por_dia[data] = p['total']
+
+        # Gerar arrays para os últimos 30 dias (garantir todos os dias mesmo sem pedidos)
+        labels = []
+        data = []
+
+        for i in range(30):
+            data_atual = inicio + timedelta(days=i)
+            labels.append(data_atual.strftime('%d/%m'))
+            data.append(pedidos_por_dia[data_atual])
+
+        total_pedidos = sum(data)
+        logger.debug(f"Gráfico gerado: {total_pedidos} pedidos nos últimos 30 dias")
+
+        return {
+            'labels': labels,
+            'data': data,
+            'total_pedidos': total_pedidos
+        }

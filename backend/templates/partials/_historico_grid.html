@@ -1,0 +1,163 @@
+<!-- Partial: Grid de Histórico de Pedidos -->
+{% if pedidos %}
+    <!-- Grid de Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+        {% for pedido_data in pedidos_processados %}
+        <div class="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow border-l-4 border-green-500">
+            <div class="p-6">
+                <!-- Header do Card -->
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">
+                            #{{ pedido_data.numero_orcamento }}
+                        </h3>
+                        <p class="text-sm text-gray-600 mt-1">
+                            {{ pedido_data.nome_cliente }}
+                        </p>
+                    </div>
+                    <!-- Badge de Finalizado -->
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        ✅ Finalizado
+                    </span>
+                </div>
+
+                <!-- Informações do Pedido -->
+                <div class="space-y-2 text-sm">
+                    <!-- Vendedor -->
+                    <div class="flex items-center">
+                        <svg class="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                        <span class="text-gray-600">Vendedor:</span>
+                        <span class="ml-1 font-medium text-gray-900">{{ pedido_data.vendedor }}</span>
+                    </div>
+
+                    <!-- Data de Finalização -->
+                    <div class="flex items-center">
+                        <svg class="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <span class="text-gray-600">Finalizado em:</span>
+                        <span class="ml-1 font-medium text-gray-900">
+                            {{ pedido_data.data_finalizacao|date:"d/m/y" }} às {{ pedido_data.data_finalizacao|date:"H:i" }}
+                        </span>
+                    </div>
+
+                    <!-- Tempo Total -->
+                    <div class="flex items-center">
+                        <svg class="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span class="text-gray-600">Tempo total:</span>
+                        <span class="ml-1 font-medium text-green-600">{{ pedido_data.tempo_total_formatado }}</span>
+                    </div>
+
+                    <!-- Total de Itens -->
+                    <div class="flex items-center">
+                        <svg class="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                        </svg>
+                        <span class="text-gray-600">Itens:</span>
+                        <span class="ml-1 font-medium text-gray-900">{{ pedido_data.itens_separados }}/{{ pedido_data.total_itens }}</span>
+                    </div>
+                </div>
+
+                <!-- Botão Ver Detalhes -->
+                <div class="mt-4 pt-4 border-t border-gray-200">
+                    <a href="{% url 'detalhe_pedido' pedido_data.id %}"
+                       class="inline-flex items-center text-sm text-blue-600 hover:text-blue-700 font-medium">
+                        Ver Detalhes
+                        <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Paginação -->
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="bg-white rounded-lg shadow-sm p-4">
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <!-- Info de Paginação -->
+            <div class="text-sm text-gray-600">
+                Mostrando {{ page_obj.start_index }} a {{ page_obj.end_index }} de {{ page_obj.paginator.count }} pedidos
+            </div>
+
+            <!-- Botões de Paginação -->
+            <div class="flex items-center space-x-2">
+                {% if page_obj.has_previous %}
+                    <!-- Primeira Página -->
+                    <a href="?page=1{% if search_query %}&busca={{ search_query }}{% endif %}{% if vendedor_id %}&vendedor={{ vendedor_id }}{% endif %}{% if data_filter %}&data={{ data_filter }}{% endif %}"
+                       class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                        ««
+                    </a>
+                    <!-- Página Anterior -->
+                    <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&busca={{ search_query }}{% endif %}{% if vendedor_id %}&vendedor={{ vendedor_id }}{% endif %}{% if data_filter %}&data={{ data_filter }}{% endif %}"
+                       class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                        «
+                    </a>
+                {% else %}
+                    <span class="px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-400 cursor-not-allowed">
+                        ««
+                    </span>
+                    <span class="px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-400 cursor-not-allowed">
+                        «
+                    </span>
+                {% endif %}
+
+                <!-- Número da Página Atual -->
+                <span class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">
+                    {{ page_obj.number }}
+                </span>
+
+                <!-- Total de Páginas -->
+                <span class="px-3 py-2 text-sm text-gray-600">
+                    de {{ page_obj.paginator.num_pages }}
+                </span>
+
+                {% if page_obj.has_next %}
+                    <!-- Próxima Página -->
+                    <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&busca={{ search_query }}{% endif %}{% if vendedor_id %}&vendedor={{ vendedor_id }}{% endif %}{% if data_filter %}&data={{ data_filter }}{% endif %}"
+                       class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                        »
+                    </a>
+                    <!-- Última Página -->
+                    <a href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&busca={{ search_query }}{% endif %}{% if vendedor_id %}&vendedor={{ vendedor_id }}{% endif %}{% if data_filter %}&data={{ data_filter }}{% endif %}"
+                       class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                        »»
+                    </a>
+                {% else %}
+                    <span class="px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-400 cursor-not-allowed">
+                        »
+                    </span>
+                    <span class="px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-400 cursor-not-allowed">
+                        »»
+                    </span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+{% else %}
+    <!-- Estado Vazio -->
+    <div class="bg-white rounded-lg shadow-sm p-12 text-center">
+        <svg class="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+        </svg>
+        <h3 class="text-lg font-medium text-gray-900 mb-2">
+            Nenhum pedido finalizado encontrado
+        </h3>
+        <p class="text-gray-500 mb-6">
+            Não há pedidos finalizados com os filtros selecionados.
+        </p>
+        <a href="{% url 'dashboard' %}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+            </svg>
+            Voltar ao Dashboard
+        </a>
+    </div>
+{% endif %}

@@ -1,0 +1,30 @@
+# Requirements - Web App Separação de Pedidos PMCELL
+# Fase 29: Django Channels e WebSockets
+
+# Core Django
+Django>=4.2,<5.0
+psycopg2-binary>=2.9.0  # PostgreSQL adapter
+
+# Django Channels (WebSockets)
+channels>=4.0.0
+channels-redis>=4.1.0
+daphne>=4.0.0  # ASGI server
+
+# Redis (cache + channel layer)
+redis>=5.0.0
+
+# PDF Processing
+pdfplumber>=0.10.0
+pypdf>=3.0.0
+
+# Testing
+pytest>=8.0.0
+pytest-django>=4.8.0
+pytest-asyncio==0.21.1  # Para testes assíncronos do Channels (versão estável)
+pytest-cov>=4.1.0
+
+# Development
+black>=24.0.0
+flake8>=7.0.0
+ipython>=8.0.0
+django-debug-toolbar>=4.2.0  # Fase 34: Performance debugging
