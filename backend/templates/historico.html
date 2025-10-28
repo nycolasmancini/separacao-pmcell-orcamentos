@@ -20,13 +20,8 @@
                         </svg>
                         Voltar ao Dashboard
                     </a>
-                    <!-- Info do Usuário -->
-                    <div class="text-right">
-                        <p class="text-sm font-medium text-gray-900">{{ usuario.nome }}</p>
-                        <p class="text-xs text-gray-500">
-                            #{{ usuario.numero_login }} - {{ usuario.tipo }}
-                        </p>
-                    </div>
+                    <!-- User Dropdown -->
+                    {% include "partials/_user_dropdown.html" %}
                 </div>
             </div>
         </div>

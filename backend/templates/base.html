@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <title>{% block title %}Separação PMCELL{% endblock %}</title>
 
     <!-- Tailwind CSS CDN (para desenvolvimento rápido) -->
@@ -24,6 +25,22 @@
         body {
             font-family: 'Inter', sans-serif;
         }
+
+        /* Animações suaves para dropdown */
+        @keyframes fadeInBackdrop {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Garantir suavidade em transições */
+        * {
+            transition-timing-function: cubic-bezier(0.4, 0.0, 0.2, 1);
+        }
+
+        /* Animação de rotação para chevron */
+        .rotate-180 {
+            transform: rotate(180deg);
+        }
     </style>
 
     {% block extra_css %}{% endblock %}
@@ -33,5 +50,12 @@
     {% block content %}{% endblock %}
 
     {% block extra_js %}{% endblock %}
+
+    <!-- Configuração HTMX para CSRF Token -->
+    <script>
+        document.body.addEventListener('htmx:configRequest', (event) => {
+            event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+        });
+    </script>
 </body>
 </html>

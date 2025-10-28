@@ -69,8 +69,8 @@
                 <div>
                     <p class="text-sm font-medium text-gray-500 mb-1">Progresso</p>
                     <div class="flex items-center">
-                        <span class="text-2xl font-bold text-green-600">{{ progresso_percentual }}%</span>
-                        <span class="text-sm text-gray-500 ml-2">({{ itens_separados|length }}/{{ itens_separados|length|add:itens_nao_separados|length }})</span>
+                        <span id="progresso-percentual" class="text-2xl font-bold text-green-600">{{ progresso_percentual }}%</span>
+                        <span id="contador-itens" class="text-sm text-gray-500 ml-2">({{ itens_separados|length }}/{{ itens_separados|length|add:itens_nao_separados|length }})</span>
                     </div>
                 </div>
             </div>
@@ -78,13 +78,13 @@
             <!-- Barra de Progresso Visual -->
             <div class="mt-6">
                 <div class="w-full bg-gray-200 rounded-full h-3">
-                    <div class="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-500" style="width: {{ progresso_percentual }}%"></div>
+                    <div id="barra-progresso" class="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-500" style="width: {{ progresso_percentual }}%"></div>
                 </div>
             </div>
 
             <!-- Botão Finalizar Pedido (aparece apenas quando progresso = 100%) -->
+            <div id="container-botao-finalizar" class="mt-6 flex justify-end" style="{% if progresso_percentual != 100 %}display: none;{% endif %}">
             {% if progresso_percentual == 100 %}
-            <div class="mt-6 flex justify-end">
                 <button
                     type="button"
                     hx-get="{% url 'finalizar_pedido' pedido_id=pedido.id %}"
@@ -97,8 +97,8 @@
                     </svg>
                     Finalizar Pedido
                 </button>
-            </div>
             {% endif %}
+            </div>
         </div>
 
         <!-- Seção: Itens Não Separados -->
@@ -111,7 +111,7 @@
                     </svg>
                     Itens Não Separados
                 </h2>
-                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+                <span id="badge-nao-separados" class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
                     {{ itens_nao_separados|length }} itens
                 </span>
             </div>
@@ -134,7 +134,7 @@
                     </svg>
                     Itens Separados
                 </h2>
-                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                <span id="badge-separados" class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
                     {{ itens_separados|length }} itens
                 </span>
             </div>
@@ -159,4 +159,191 @@
         {% endif %}
     </main>
 </div>
+
+{# WebSocket para atualizações em tempo real #}
+<script>
+(function() {
+    'use strict';
+
+    // Configuração do WebSocket
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/dashboard/`;
+    const pedidoId = {{ pedido.id }};
+    let socket = null;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 10;
+    const reconnectDelay = 3000; // 3 segundos
+
+    console.log('[DetalhesPedido] Inicializando WebSocket para pedido', pedidoId);
+
+    // Conectar ao WebSocket
+    function connect() {
+        console.log('[WebSocket] Conectando...', wsUrl);
+
+        try {
+            socket = new WebSocket(wsUrl);
+
+            socket.onopen = function(e) {
+                console.log('[WebSocket] Conectado com sucesso!');
+                reconnectAttempts = 0;
+            };
+
+            socket.onmessage = function(event) {
+                console.log('[WebSocket] Mensagem recebida:', event.data);
+
+                try {
+                    const data = JSON.parse(event.data);
+                    handleWebSocketEvent(data);
+                } catch (error) {
+                    console.error('[WebSocket] Erro ao parsear mensagem:', error);
+                }
+            };
+
+            socket.onclose = function(event) {
+                console.log('[WebSocket] Conexão fechada:', event.code, event.reason);
+
+                // Tentar reconectar
+                if (reconnectAttempts < maxReconnectAttempts) {
+                    reconnectAttempts++;
+                    console.log(`[WebSocket] Tentando reconectar (${reconnectAttempts}/${maxReconnectAttempts})...`);
+                    setTimeout(connect, reconnectDelay);
+                } else {
+                    console.error('[WebSocket] Máximo de tentativas de reconexão atingido.');
+                }
+            };
+
+            socket.onerror = function(error) {
+                console.error('[WebSocket] Erro:', error);
+            };
+        } catch (error) {
+            console.error('[WebSocket] Erro ao criar conexão:', error);
+        }
+    }
+
+    // Manipular eventos WebSocket
+    function handleWebSocketEvent(data) {
+        const { type, pedido_id } = data;
+
+        // Só processar eventos do pedido atual
+        if (pedido_id !== pedidoId) {
+            console.log('[WebSocket] Evento ignorado - pedido diferente:', pedido_id);
+            return;
+        }
+
+        switch (type) {
+            case 'item_separado':
+                handleItemSeparado(data);
+                break;
+
+            case 'pedido_finalizado':
+                handlePedidoFinalizado(data);
+                break;
+
+            default:
+                console.warn('[WebSocket] Tipo de evento desconhecido:', type);
+        }
+    }
+
+    // Handler: Item Separado (atualizar progresso em tempo real)
+    function handleItemSeparado(data) {
+        const { progresso, itens_separados, total_itens } = data;
+
+        console.log('[WebSocket] Item separado:', {
+            progresso: progresso + '%',
+            itens: `${itens_separados}/${total_itens}`
+        });
+
+        // 1. Atualizar progresso percentual
+        const progressoEl = document.getElementById('progresso-percentual');
+        if (progressoEl) {
+            progressoEl.textContent = progresso + '%';
+            // Adicionar animação de destaque
+            progressoEl.classList.add('progress-update-animation');
+            setTimeout(() => {
+                progressoEl.classList.remove('progress-update-animation');
+            }, 500);
+        }
+
+        // 2. Atualizar contador de itens (X/Y)
+        const contadorEl = document.getElementById('contador-itens');
+        if (contadorEl) {
+            contadorEl.textContent = `(${itens_separados}/${total_itens})`;
+        }
+
+        // 3. Atualizar barra de progresso visual
+        const barraProgressoEl = document.getElementById('barra-progresso');
+        if (barraProgressoEl) {
+            barraProgressoEl.style.width = progresso + '%';
+        }
+
+        // 4. Atualizar badge de itens não separados
+        const badgeNaoSeparadosEl = document.getElementById('badge-nao-separados');
+        if (badgeNaoSeparadosEl) {
+            const naoSeparados = total_itens - itens_separados;
+            badgeNaoSeparadosEl.textContent = `${naoSeparados} itens`;
+        }
+
+        // 5. Atualizar badge de itens separados
+        const badgeSeparadosEl = document.getElementById('badge-separados');
+        if (badgeSeparadosEl) {
+            badgeSeparadosEl.textContent = `${itens_separados} itens`;
+        }
+
+        // 6. Mostrar/ocultar botão finalizar quando atinge 100%
+        const containerBotaoFinalizar = document.getElementById('container-botao-finalizar');
+        if (containerBotaoFinalizar) {
+            if (progresso === 100) {
+                containerBotaoFinalizar.style.display = 'flex';
+                // Adicionar animação de fade-in
+                containerBotaoFinalizar.style.opacity = '0';
+                setTimeout(() => {
+                    containerBotaoFinalizar.style.transition = 'opacity 0.5s ease-in';
+                    containerBotaoFinalizar.style.opacity = '1';
+                }, 10);
+            } else {
+                containerBotaoFinalizar.style.display = 'none';
+            }
+        }
+
+        console.log('[WebSocket] UI atualizada com sucesso');
+    }
+
+    // Handler: Pedido Finalizado (redirecionar para dashboard)
+    function handlePedidoFinalizado(data) {
+        console.log('[WebSocket] Pedido finalizado:', data.pedido_id);
+
+        // Mostrar mensagem e redirecionar
+        alert('Este pedido foi finalizado!');
+        window.location.href = "{% url 'dashboard' %}";
+    }
+
+    // Iniciar conexão WebSocket ao carregar a página
+    connect();
+
+    // Fechar conexão ao sair da página
+    window.addEventListener('beforeunload', function() {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.close();
+        }
+    });
+})();
+</script>
+
+<style>
+    /* Animação de destaque para progresso atualizado */
+    @keyframes progressPulse {
+        0%, 100% {
+            transform: scale(1);
+            color: #10b981;
+        }
+        50% {
+            transform: scale(1.1);
+            color: #059669;
+        }
+    }
+
+    .progress-update-animation {
+        animation: progressPulse 0.5s ease-out;
+    }
+</style>
 {% endblock %}

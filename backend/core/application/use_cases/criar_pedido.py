@@ -63,6 +63,7 @@ class CriarPedidoUseCase:
     ERROR_MATH_VALIDATION = "Validação matemática dos produtos falhou"
     ERROR_BUSINESS_RULES = "Validação de regras de negócio falhou"
     ERROR_PERSISTENCE = "Falha ao persistir pedido no banco de dados"
+    ERROR_DUPLICATE_ORDER = "Orçamento já cadastrado no sistema"
 
     def __init__(
         self,
@@ -101,12 +102,13 @@ class CriarPedidoUseCase:
             1. Extrair texto do PDF
             2. Extrair header (número, cliente, vendedor)
             3. Validar header
-            4. Extrair produtos
-            5. Validar produtos (incluindo validação matemática)
-            6. Criar entidade Pedido
-            7. Validar regras de negócio
-            8. Persistir no repositório
-            9. Retornar resposta
+            4. Validar se orçamento já existe (evitar duplicatas)
+            5. Extrair produtos
+            6. Validar produtos (incluindo validação matemática)
+            7. Criar entidade Pedido
+            8. Validar regras de negócio
+            9. Persistir no repositório
+            10. Retornar resposta
 
         Notes:
             - Todas as exceções são capturadas e retornadas como ResponseDTO
@@ -132,6 +134,13 @@ class CriarPedidoUseCase:
                 return self._criar_response_erro(
                     self.ERROR_HEADER_INVALID,
                     header.errors
+                )
+
+            # Etapa 2.5: Validar se orçamento já existe
+            if not self._validar_orcamento_duplicado(header.numero_orcamento):
+                return self._criar_response_erro(
+                    self.ERROR_DUPLICATE_ORDER,
+                    [f"Orçamento {header.numero_orcamento} já foi cadastrado anteriormente"]
                 )
 
             # Etapa 3: Extrair produtos
@@ -226,6 +235,22 @@ class CriarPedidoUseCase:
         if not is_valid:
             logger.warning(f"Header inválido. Erros: {header.errors}")
         return is_valid
+
+    def _validar_orcamento_duplicado(self, numero_orcamento: str) -> bool:
+        """
+        Valida se o orçamento já existe no sistema.
+
+        Args:
+            numero_orcamento: Número do orçamento a validar
+
+        Returns:
+            True se não existe (válido), False se já existe (duplicado)
+        """
+        pedido_existente = self.pedido_repository.get_by_numero_orcamento(numero_orcamento)
+        if pedido_existente:
+            logger.warning(f"Orçamento {numero_orcamento} já cadastrado no sistema (Pedido ID: {pedido_existente.id})")
+            return False
+        return True
 
     def _extrair_produtos(self, texto: str) -> List[ProdutoDTO]:
         """

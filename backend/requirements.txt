@@ -1,5 +1,5 @@
 # Requirements - Web App Separação de Pedidos PMCELL
-# Fase 29: Django Channels e WebSockets
+# Fase 35: Deploy para Produção
 
 # Core Django
 Django>=4.2,<5.0
@@ -12,6 +12,11 @@ daphne>=4.0.0  # ASGI server
 
 # Redis (cache + channel layer)
 redis>=5.0.0
+
+# Production (Fase 35)
+whitenoise>=6.6.0  # Servir arquivos estáticos em produção
+python-decouple>=3.8  # Gerenciar variáveis de ambiente
+dj-database-url>=2.1.0  # Parse DATABASE_URL do Railway
 
 # PDF Processing
 pdfplumber>=0.10.0
@@ -27,4 +32,3 @@ pytest-cov>=4.1.0
 black>=24.0.0
 flake8>=7.0.0
 ipython>=8.0.0
-django-debug-toolbar>=4.2.0  # Fase 34: Performance debugging

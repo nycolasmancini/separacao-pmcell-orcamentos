@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Criar Usuário - PMCELL{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">➕ Adicionar Novo Usuário</h1>
+                    <p class="text-sm text-gray-600">Criar novo acesso ao sistema</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <!-- Botão Voltar -->
+                    <a href="{% url 'admin_panel' %}" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors shadow-sm">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                        </svg>
+                        Voltar
+                    </a>
+                    <!-- User Dropdown -->
+                    {% include "partials/_user_dropdown.html" %}
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="bg-white rounded-lg shadow-sm p-8">
+            <!-- Mensagens de erro -->
+            {% if form.non_field_errors %}
+            <div class="mb-6 bg-red-50 border-l-4 border-red-400 p-4">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-red-800">
+                            {{ form.non_field_errors.0 }}
+                        </h3>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Formulário -->
+            <form method="post" class="space-y-6">
+                {% csrf_token %}
+
+                <!-- Número de Login -->
+                <div>
+                    <label for="{{ form.numero_login.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        {{ form.numero_login.label }}
+                        <span class="text-red-500">*</span>
+                    </label>
+                    {{ form.numero_login }}
+                    {% if form.numero_login.errors %}
+                        <p class="mt-2 text-sm text-red-600">{{ form.numero_login.errors.0 }}</p>
+                    {% endif %}
+                    <p class="mt-1 text-sm text-gray-500">Número único para identificação do usuário</p>
+                </div>
+
+                <!-- Nome -->
+                <div>
+                    <label for="{{ form.nome.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        {{ form.nome.label }}
+                        <span class="text-red-500">*</span>
+                    </label>
+                    {{ form.nome }}
+                    {% if form.nome.errors %}
+                        <p class="mt-2 text-sm text-red-600">{{ form.nome.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Tipo de Usuário -->
+                <div>
+                    <label for="{{ form.tipo.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        {{ form.tipo.label }}
+                        <span class="text-red-500">*</span>
+                    </label>
+                    {{ form.tipo }}
+                    {% if form.tipo.errors %}
+                        <p class="mt-2 text-sm text-red-600">{{ form.tipo.errors.0 }}</p>
+                    {% endif %}
+                    <div class="mt-3 bg-blue-50 border-l-4 border-blue-400 p-4">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm text-blue-700">
+                                    <strong>Vendedor:</strong> Cria pedidos<br>
+                                    <strong>Separador:</strong> Separa itens dos pedidos<br>
+                                    <strong>Compradora:</strong> Gerencia compras<br>
+                                    <strong>Administrador:</strong> Acesso total ao sistema
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PIN -->
+                <div>
+                    <label for="{{ form.pin.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        {{ form.pin.label }}
+                        <span class="text-red-500">*</span>
+                    </label>
+                    {{ form.pin }}
+                    {% if form.pin.errors %}
+                        <p class="mt-2 text-sm text-red-600">{{ form.pin.errors.0 }}</p>
+                    {% endif %}
+                    <p class="mt-1 text-sm text-gray-500">PIN de 4 dígitos numéricos</p>
+                </div>
+
+                <!-- Confirmar PIN -->
+                <div>
+                    <label for="{{ form.pin_confirmacao.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        {{ form.pin_confirmacao.label }}
+                        <span class="text-red-500">*</span>
+                    </label>
+                    {{ form.pin_confirmacao }}
+                    {% if form.pin_confirmacao.errors %}
+                        <p class="mt-2 text-sm text-red-600">{{ form.pin_confirmacao.errors.0 }}</p>
+                    {% endif %}
+                    <p class="mt-1 text-sm text-gray-500">Digite o mesmo PIN novamente</p>
+                </div>
+
+                <!-- Botões -->
+                <div class="flex justify-end space-x-4 pt-4 border-t">
+                    <a href="{% url 'admin_panel' %}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                        Cancelar
+                    </a>
+                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors shadow-sm">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        Criar Usuário
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Informações Adicionais -->
+        <div class="mt-6 bg-yellow-50 border-l-4 border-yellow-400 p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-yellow-800">
+                        Importante
+                    </h3>
+                    <div class="mt-2 text-sm text-yellow-700">
+                        <p>
+                            • O número de login deve ser único e não pode ser alterado depois<br>
+                            • O PIN deve ter exatamente 4 dígitos numéricos<br>
+                            • Guarde as credenciais em local seguro
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}

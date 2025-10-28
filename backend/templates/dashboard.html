@@ -65,6 +65,15 @@
                     <p class="text-sm text-gray-600">Separação de Pedidos</p>
                 </div>
                 <div class="flex items-center space-x-4">
+                    <!-- Botão Painel de Administração (visível apenas para ADMINISTRADOR) -->
+                    {% if usuario.is_admin %}
+                    <a href="{% url 'admin_panel' %}" class="inline-flex items-center px-4 py-2 bg-gray-700 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors shadow-sm">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                        </svg>
+                        👥 Gerenciar Usuários
+                    </a>
+                    {% endif %}
                     <!-- Botão Painel de Compras (visível apenas para COMPRADORA) -->
                     {% if usuario.tipo == 'COMPRADORA' %}
                     <a href="{% url 'painel_compras' %}" class="inline-flex items-center px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 transition-colors shadow-sm">
@@ -88,13 +97,8 @@
                         </svg>
                         Criar Novo Pedido
                     </a>
-                    <!-- Info do Usuário -->
-                    <div class="text-right">
-                        <p class="text-sm font-medium text-gray-900">{{ usuario.nome }}</p>
-                        <p class="text-xs text-gray-500">
-                            #{{ usuario.numero_login }} - {{ usuario.tipo }}
-                        </p>
-                    </div>
+                    <!-- User Dropdown -->
+                    {% include "partials/_user_dropdown.html" %}
                 </div>
             </div>
         </div>
@@ -238,7 +242,7 @@
 
     // Manipular eventos WebSocket
     function handleWebSocketEvent(data) {
-        const { type, pedido_id, progresso } = data;
+        const { type, pedido_id, progresso, itens_separados, total_itens } = data;
 
         switch (type) {
             case 'pedido_criado':
@@ -246,7 +250,7 @@
                 break;
 
             case 'item_separado':
-                handleItemSeparado(pedido_id, progresso);
+                handleItemSeparado(pedido_id, progresso, itens_separados, total_itens);
                 break;
 
             case 'pedido_finalizado':
@@ -286,8 +290,8 @@
     }
 
     // Handler: Item Separado (atualizar progresso)
-    function handleItemSeparado(pedidoId, progresso) {
-        console.log('[WebSocket] Item separado - Pedido:', pedidoId, 'Progresso:', progresso + '%');
+    function handleItemSeparado(pedidoId, progresso, itens_separados, total_itens) {
+        console.log('[WebSocket] Item separado - Pedido:', pedidoId, 'Progresso:', progresso + '%', 'Itens:', itens_separados + '/' + total_itens);
 
         // Encontrar o card do pedido e atualizar barra de progresso
         const cardSelector = `[data-pedido-id="${pedidoId}"]`;
@@ -312,7 +316,13 @@
                 progressText.textContent = progresso + '%';
             }
 
-            console.log('[WebSocket] Progresso atualizado');
+            // Atualizar contador de itens (X/Y itens separados)
+            const contadorItens = card.querySelector('.contador-itens');
+            if (contadorItens) {
+                contadorItens.textContent = itens_separados + '/' + total_itens + ' itens separados';
+            }
+
+            console.log('[WebSocket] Progresso e contador atualizados');
         } else {
             console.warn('[WebSocket] Card do pedido não encontrado:', pedidoId);
         }

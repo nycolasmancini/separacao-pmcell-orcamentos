@@ -101,12 +101,24 @@ class DashboardConsumer(AsyncWebsocketConsumer):
         Handler para evento 'item_separado'.
         Atualiza progresso do pedido em tempo real.
 
-        Implementação completa na Fase 30.
+        Args:
+            event (dict): Evento recebido do channel layer
+                - pedido_id: ID do pedido
+                - progresso: Progresso percentual (0-100)
+                - itens_separados: Número de itens já separados
+                - total_itens: Número total de itens do pedido
+                - item_id: ID do item que foi marcado/desmarcado
+
+        Envia para o cliente WebSocket todos os dados necessários para
+        atualizar a UI em tempo real sem recarregar a página.
         """
         await self.send(text_data=json.dumps({
             'type': 'item_separado',
             'pedido_id': event['pedido_id'],
             'progresso': event['progresso'],
+            'itens_separados': event['itens_separados'],
+            'total_itens': event['total_itens'],
+            'item_id': event['item_id']
         }))
 
     async def pedido_finalizado(self, event):

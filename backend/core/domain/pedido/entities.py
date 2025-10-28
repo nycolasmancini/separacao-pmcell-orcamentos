@@ -111,6 +111,46 @@ class ItemPedido:
             f"por {usuario}"
         )
 
+    def desmarcar_separado(self) -> None:
+        """
+        Desmarca o item como separado, removendo TODAS as marcações e informações.
+
+        Remove informações de:
+        - Separação (separado, separado_por, separado_em, quantidade_separada)
+        - Compra (em_compra, enviado_para_compra_por, enviado_para_compra_em)
+        - Substituição (substituido, produto_substituto)
+
+        Útil para corrigir erros (misclick) ou quando o item precisa ser
+        re-separado por algum motivo.
+
+        Raises:
+            ValidationError: Se o item não estiver marcado como separado
+        """
+        if not self.separado:
+            logger.warning(f"Item {self.id} não está marcado como separado")
+            raise ValidationError("Item não está marcado como separado")
+
+        # Remover TODAS as informações e marcações
+        # Campos de separação
+        self.separado = False
+        self.quantidade_separada = 0
+        self.separado_por = None
+        self.separado_em = None
+
+        # Campos de compra
+        self.em_compra = False
+        self.enviado_para_compra_por = None
+        self.enviado_para_compra_em = None
+
+        # Campos de substituição
+        self.substituido = False
+        self.produto_substituto = None
+
+        logger.info(
+            f"Item {self.id} (produto {self.produto.codigo}) desmarcado - "
+            f"todas as marcações foram removidas"
+        )
+
     def esta_completo(self) -> bool:
         """
         Verifica se o item foi completamente separado.

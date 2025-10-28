@@ -1,0 +1,380 @@
+/**
+ * animations.css
+ * Fase 16: Animações e feedback visual para o sistema de upload
+ *
+ * Contém:
+ * - Animações de loading (spinner, pulso)
+ * - Animações de transição (slide down, fade in/out)
+ * - Animações de feedback (shake, success)
+ * - Progress bar
+ */
+
+/* ============================================
+   ANIMAÇÕES DE LOADING
+   ============================================ */
+
+/* Spinner rotativo */
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.spinner {
+    animation: spin 1s linear infinite;
+}
+
+/* Pulso suave para elementos de loading */
+@keyframes pulse-slow {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.pulse-slow {
+    animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Dots de loading animados */
+@keyframes dots {
+    0%, 20% {
+        content: '.';
+    }
+    40% {
+        content: '..';
+    }
+    60%, 100% {
+        content: '...';
+    }
+}
+
+.loading-dots::after {
+    content: '.';
+    animation: dots 1.5s steps(1, end) infinite;
+}
+
+/* ============================================
+   ANIMAÇÕES DE TRANSIÇÃO
+   ============================================ */
+
+/* Slide down (para mensagens e preview) */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.slide-down {
+    animation: slideDown 0.3s ease-out forwards;
+}
+
+/* Slide up (para remover elementos) */
+@keyframes slideUp {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+}
+
+.slide-up {
+    animation: slideUp 0.3s ease-out forwards;
+}
+
+/* Fade in suave */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.4s ease-in forwards;
+}
+
+/* Fade out suave */
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+.fade-out {
+    animation: fadeOut 0.3s ease-out forwards;
+}
+
+/* Scale in (zoom in suave) */
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.scale-in {
+    animation: scaleIn 0.3s ease-out forwards;
+}
+
+/* ============================================
+   ANIMAÇÕES DE FEEDBACK
+   ============================================ */
+
+/* Shake (para erros) */
+@keyframes shake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    10%, 30%, 50%, 70%, 90% {
+        transform: translateX(-8px);
+    }
+    20%, 40%, 60%, 80% {
+        transform: translateX(8px);
+    }
+}
+
+.shake {
+    animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* Bounce (para sucesso) */
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+.bounce {
+    animation: bounce 0.6s ease-in-out;
+}
+
+/* Success checkmark animation */
+@keyframes checkmark {
+    0% {
+        stroke-dashoffset: 100;
+    }
+    100% {
+        stroke-dashoffset: 0;
+    }
+}
+
+.checkmark-animation {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    animation: checkmark 0.6s ease-in-out forwards;
+}
+
+/* Glow (destaque suave) */
+@keyframes glow {
+    0%, 100% {
+        box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
+    }
+}
+
+.glow {
+    animation: glow 2s ease-in-out infinite;
+}
+
+/* ============================================
+   PROGRESS BAR
+   ============================================ */
+
+/* Progress bar fill animation */
+@keyframes progressFill {
+    from {
+        width: 0%;
+    }
+}
+
+.progress-bar-fill {
+    transition: width 0.3s ease-out;
+}
+
+/* Progress bar shimmer effect */
+@keyframes shimmer {
+    0% {
+        background-position: -1000px 0;
+    }
+    100% {
+        background-position: 1000px 0;
+    }
+}
+
+.progress-shimmer {
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.4) 50%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    background-size: 1000px 100%;
+    animation: shimmer 2s infinite;
+}
+
+/* ============================================
+   ESTADOS DE DISABLED
+   ============================================ */
+
+/* Fade out para elementos disabled */
+.disabled-state {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+    transition: opacity 0.2s ease-out;
+}
+
+/* Overlay de loading */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    animation: fadeIn 0.2s ease-in;
+}
+
+/* ============================================
+   TOOLTIP ANIMATIONS
+   ============================================ */
+
+@keyframes tooltipFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.tooltip {
+    animation: tooltipFadeIn 0.2s ease-out;
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+/* Transitions suaves (para Tailwind) */
+.transition-smooth {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.transition-fast {
+    transition: all 0.15s ease-out;
+}
+
+.transition-slow {
+    transition: all 0.5s ease-in-out;
+}
+
+/* Remover animações para usuários com preferência de movimento reduzido */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ============================================
+   CONFETTI (OPCIONAL)
+   ============================================ */
+
+@keyframes confetti-fall {
+    from {
+        transform: translateY(-100vh) rotate(0deg);
+    }
+    to {
+        transform: translateY(100vh) rotate(720deg);
+    }
+}
+
+.confetti {
+    position: fixed;
+    width: 10px;
+    height: 10px;
+    animation: confetti-fall 3s linear forwards;
+    z-index: 10000;
+}
+
+/* ============================================
+   FOCUS STATES MELHORADOS
+   ============================================ */
+
+/* Ring de foco com animação */
+.focus-ring:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+    transition: box-shadow 0.2s ease-in-out;
+}
+
+/* Hover suave */
+.hover-lift {
+    transition: transform 0.2s ease-out;
+}
+
+.hover-lift:hover {
+    transform: translateY(-2px);
+}
+
+/* ============================================
+   SKELETON LOADING
+   ============================================ */
+
+@keyframes skeleton-loading {
+    0% {
+        background-position: -200px 0;
+    }
+    100% {
+        background-position: calc(200px + 100%) 0;
+    }
+}
+
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        #f0f0f0 0px,
+        #e0e0e0 40px,
+        #f0f0f0 80px
+    );
+    background-size: 200px 100%;
+    animation: skeleton-loading 1.5s ease-in-out infinite;
+}

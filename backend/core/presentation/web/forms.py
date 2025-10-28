@@ -223,3 +223,140 @@ class UploadOrcamentoForm(forms.Form):
                 raise ValidationError(f'Valores inválidos de logística ou embalagem: {e}')
 
         return cleaned_data
+
+
+class CriarUsuarioForm(forms.Form):
+    """
+    Formulário para criar novo usuário.
+
+    Fields:
+        numero_login: Número único de identificação
+        nome: Nome completo do usuário
+        pin: PIN de 4 dígitos
+        pin_confirmacao: Confirmação do PIN
+        tipo: Tipo de usuário (VENDEDOR, SEPARADOR, COMPRADORA, ADMINISTRADOR)
+    """
+
+    numero_login = forms.IntegerField(
+        label='Número de Login',
+        min_value=1,
+        widget=forms.NumberInput(attrs={
+            'class': 'w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all',
+            'placeholder': 'Ex: 101',
+            'autofocus': True,
+        }),
+        error_messages={
+            'required': 'O número de login é obrigatório',
+            'invalid': 'Digite um número válido',
+            'min_value': 'O número deve ser maior que zero',
+        }
+    )
+
+    nome = forms.CharField(
+        label='Nome Completo',
+        max_length=200,
+        widget=forms.TextInput(attrs={
+            'class': 'w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all',
+            'placeholder': 'Nome completo do usuário',
+        }),
+        error_messages={
+            'required': 'O nome é obrigatório',
+            'max_length': 'O nome é muito longo (máximo 200 caracteres)',
+        }
+    )
+
+    tipo = forms.ChoiceField(
+        label='Tipo de Usuário',
+        choices=[
+            ('VENDEDOR', 'Vendedor'),
+            ('SEPARADOR', 'Separador'),
+            ('COMPRADORA', 'Compradora'),
+            ('ADMINISTRADOR', 'Administrador'),
+        ],
+        widget=forms.Select(attrs={
+            'class': 'w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all',
+        }),
+        error_messages={
+            'required': 'O tipo de usuário é obrigatório',
+        }
+    )
+
+    pin = forms.CharField(
+        label='PIN (4 dígitos)',
+        max_length=4,
+        min_length=4,
+        widget=forms.PasswordInput(attrs={
+            'class': 'w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all',
+            'placeholder': '••••',
+            'maxlength': '4',
+            'pattern': '[0-9]{4}',
+            'inputmode': 'numeric',
+        }),
+        error_messages={
+            'required': 'O PIN é obrigatório',
+            'max_length': 'O PIN deve ter exatamente 4 dígitos',
+            'min_length': 'O PIN deve ter exatamente 4 dígitos',
+        }
+    )
+
+    pin_confirmacao = forms.CharField(
+        label='Confirmar PIN',
+        max_length=4,
+        min_length=4,
+        widget=forms.PasswordInput(attrs={
+            'class': 'w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all',
+            'placeholder': '••••',
+            'maxlength': '4',
+            'pattern': '[0-9]{4}',
+            'inputmode': 'numeric',
+        }),
+        error_messages={
+            'required': 'A confirmação do PIN é obrigatória',
+            'max_length': 'O PIN deve ter exatamente 4 dígitos',
+            'min_length': 'O PIN deve ter exatamente 4 dígitos',
+        }
+    )
+
+    def clean_pin(self):
+        """Valida que o PIN tem exatamente 4 dígitos numéricos."""
+        pin = self.cleaned_data.get('pin', '')
+
+        if not pin:
+            raise ValidationError('O PIN é obrigatório')
+
+        if len(pin) != 4:
+            raise ValidationError('O PIN deve ter exatamente 4 dígitos')
+
+        if not pin.isdigit():
+            raise ValidationError('O PIN deve conter apenas números')
+
+        return pin
+
+    def clean_numero_login(self):
+        """Valida que o número de login é único."""
+        from core.models import Usuario
+
+        numero = self.cleaned_data.get('numero_login')
+
+        if numero is None:
+            raise ValidationError('O número de login é obrigatório')
+
+        if numero < 1:
+            raise ValidationError('O número de login deve ser maior que zero')
+
+        # Verificar se já existe
+        if Usuario.objects.filter(numero_login=numero).exists():
+            raise ValidationError(f'Já existe um usuário com o número de login {numero}')
+
+        return numero
+
+    def clean(self):
+        """Valida que os PINs conferem."""
+        cleaned_data = super().clean()
+        pin = cleaned_data.get('pin')
+        pin_confirmacao = cleaned_data.get('pin_confirmacao')
+
+        if pin and pin_confirmacao and pin != pin_confirmacao:
+            raise ValidationError('Os PINs não conferem. Digite o mesmo PIN nos dois campos.')
+
+        return cleaned_data

@@ -1,0 +1,8 @@
+# Dependências de Desenvolvimento
+# Instale com: pip install -r requirements-dev.txt
+
+# Inclui todas as dependências de produção
+-r requirements.txt
+
+# Ferramentas de desenvolvimento adicionais
+django-debug-toolbar>=4.2.0  # Performance debugging (Fase 34)

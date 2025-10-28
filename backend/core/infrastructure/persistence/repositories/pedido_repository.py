@@ -11,6 +11,7 @@ from typing import Optional, List
 from datetime import datetime
 from django.db.models import Avg, ExpressionWrapper, F, fields
 from django.db.models.functions import Extract
+from django.db.utils import IntegrityError
 from django.utils import timezone
 from core.domain.pedido.entities import Pedido as PedidoEntity
 from core.models import Pedido as PedidoDjango, ItemPedido as ItemPedidoDjango, Usuario
@@ -177,6 +178,14 @@ class DjangoPedidoRepository(PedidoRepositoryInterface):
         except Usuario.DoesNotExist:
             logger.error(f"Vendedor '{pedido.vendedor}' não encontrado")
             raise ValueError(f"Vendedor '{pedido.vendedor}' não encontrado")
+        except IntegrityError as e:
+            # Tratar especificamente erro de orçamento duplicado
+            if 'numero_orcamento' in str(e):
+                logger.error(f"Orçamento {pedido.numero_orcamento} já existe no sistema")
+                raise ValueError(f"Orçamento {pedido.numero_orcamento} já cadastrado no sistema")
+            else:
+                logger.error(f"Erro de integridade ao salvar pedido: {e}")
+                raise ValueError(f"Erro de integridade no banco de dados: {e}")
         except Exception as e:
             logger.error(f"Erro ao salvar pedido: {e}")
             raise
@@ -191,8 +200,22 @@ class DjangoPedidoRepository(PedidoRepositoryInterface):
         """
         from core.infrastructure.persistence.models.produto import Produto as ProdutoDjango
 
-        # Buscar produto
-        produto_django = ProdutoDjango.objects.get(codigo=item_entity.produto.codigo)
+        # Buscar ou criar produto automaticamente
+        produto_django, created = ProdutoDjango.objects.get_or_create(
+            codigo=item_entity.produto.codigo,
+            defaults={
+                'descricao': item_entity.produto.descricao,
+                'quantidade': item_entity.produto.quantidade,
+                'valor_unitario': item_entity.produto.valor_unitario,
+                'valor_total': item_entity.produto.valor_total
+            }
+        )
+        if created:
+            logger.info(
+                f"Produto {produto_django.codigo} criado automaticamente: "
+                f"{produto_django.descricao} (Qtd: {produto_django.quantidade}, "
+                f"Valor Unit: R$ {produto_django.valor_unitario})"
+            )
 
         # Buscar usuário que separou (se houver)
         separado_por = None

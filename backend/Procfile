@@ -1,0 +1,8 @@
+# Procfile para Railway.app
+# Usa Daphne (ASGI) para suportar WebSockets + HTTP
+
+# Migrar banco de dados antes de iniciar
+release: python manage.py migrate --noinput && python manage.py collectstatic --noinput
+
+# Servidor ASGI (Daphne) para WebSockets + HTTP
+web: daphne -b 0.0.0.0 -p $PORT separacao_pmcell.asgi:application

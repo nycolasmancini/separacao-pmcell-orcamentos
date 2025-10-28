@@ -72,6 +72,7 @@ class TestCriarPedidoUseCase:
         """Mock do PedidoRepository."""
         repository = Mock()
         repository.save = Mock(return_value=1)  # ID do pedido criado
+        repository.get_by_numero_orcamento = Mock(return_value=None)  # Por padrão, nenhum pedido duplicado
         return repository
 
     @pytest.fixture
@@ -351,3 +352,49 @@ class TestCriarPedidoUseCase:
         assert response.success is True
         assert response.pedido.data_inicio is not None
         assert response.pedido.tempo_decorrido_minutos() >= 0
+
+    # ==================== TESTE 9: VALIDAÇÃO DE ORÇAMENTO DUPLICADO ====================
+    def test_criar_pedido_rejeita_orcamento_duplicado(
+        self, use_case, valid_request_dto, mock_pedido_repository
+    ):
+        """
+        Testa que o sistema rejeita orçamento duplicado.
+
+        Cenário:
+        - Tentativa de criar pedido com numero_orcamento já existente
+        - Repositório retorna pedido existente ao consultar por numero_orcamento
+
+        Resultado esperado:
+        - ResponseDTO com success=False
+        - Mensagem de erro indicando que orçamento já foi cadastrado
+        - Erro de validação contendo o numero_orcamento
+        - Pedido não é persistido novamente
+        """
+        # Arrange: Simular pedido existente
+        pedido_existente = Pedido(
+            id=999,
+            numero_orcamento="30567",
+            codigo_cliente="001007",
+            nome_cliente="ROSANA DE CASSIA SINEZIO",
+            vendedor="NYCOLAS HENDRIGO MANCINI",
+            data="22/10/25",
+            logistica=Logistica.CORREIOS,
+            embalagem=Embalagem.CAIXA,
+            itens=[]
+        )
+        mock_pedido_repository.get_by_numero_orcamento = Mock(return_value=pedido_existente)
+
+        # Act
+        response = use_case.execute(valid_request_dto)
+
+        # Assert
+        assert response.success is False
+        assert "já cadastrado" in response.error_message.lower() or "duplicado" in response.error_message.lower()
+        assert len(response.validation_errors) > 0
+        assert "30567" in response.validation_errors[0]
+
+        # Verificar que o repositório NÃO foi chamado para salvar
+        mock_pedido_repository.save.assert_not_called()
+
+        # Verificar que get_by_numero_orcamento FOI chamado
+        mock_pedido_repository.get_by_numero_orcamento.assert_called_once_with("30567")

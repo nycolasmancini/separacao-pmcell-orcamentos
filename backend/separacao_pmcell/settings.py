@@ -1,28 +1,35 @@
 # -*- coding: utf-8 -*-
 """
 Django settings for separacao_pmcell project.
-Fase 29: Configuração com Django Channels e WebSockets
+Fase 35: Configuração para Deploy em Produção
 """
 
 import os
+import sys
+import urllib.parse
 from pathlib import Path
+from decouple import config, Csv
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-dev-key-change-in-production-8#v7x$@p&m9z2k!'
+# Em desenvolvimento, usa chave padrão. Em produção, DEVE vir do .env
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-dev-key-change-in-production-8#v7x$@p&m9z2k!')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+# Hosts permitidos (separados por vírgula no .env)
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,192.168.15.110,0.0.0.0', cast=Csv())
+
+# CSRF Trusted Origins (para Railway e outros)
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
 
 
 # Application definition
-
-import sys
 
 INSTALLED_APPS = [
     'daphne',  # Fase 29: ASGI server (deve vir ANTES de django.contrib.staticfiles)
@@ -36,12 +43,28 @@ INSTALLED_APPS = [
     'core',  # Nossa aplicação principal
 ]
 
-# Fase 34: Debug toolbar (apenas quando não estiver rodando testes)
-if 'test' not in sys.argv:
-    INSTALLED_APPS.insert(7, 'debug_toolbar')
+# Fase 34 & 35: Detectar ambiente de testes
+# Verifica se pytest está rodando ou se variável de ambiente foi definida
+TESTING = (
+    os.environ.get('DISABLE_DEBUG_TOOLBAR') == '1' or
+    'pytest' in sys.modules or
+    'py.test' in sys.modules
+)
+
+# Fase 34: Debug toolbar (apenas em desenvolvimento, não em testes ou produção)
+# Usa try/except para evitar erro se debug_toolbar não estiver instalado
+DEBUG_TOOLBAR_ENABLED = False
+if DEBUG and not TESTING:
+    try:
+        import debug_toolbar
+        INSTALLED_APPS.insert(7, 'debug_toolbar')
+        DEBUG_TOOLBAR_ENABLED = True
+    except ImportError:
+        pass
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Fase 35: Servir arquivos estáticos em produção
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -51,8 +74,8 @@ MIDDLEWARE = [
     'core.middleware.authentication.SessionTimeoutMiddleware',  # Middleware customizado - Fase 8
 ]
 
-# Fase 34: Debug toolbar middleware (apenas quando não estiver rodando testes)
-if 'test' not in sys.argv:
+# Fase 34: Debug toolbar middleware (apenas se habilitado)
+if DEBUG_TOOLBAR_ENABLED:
     MIDDLEWARE.insert(7, 'debug_toolbar.middleware.DebugToolbarMiddleware')
 
 ROOT_URLCONF = 'separacao_pmcell.urls'
@@ -80,13 +103,22 @@ ASGI_APPLICATION = 'separacao_pmcell.asgi.application'
 
 
 # Database
-# SQLite para desenvolvimento/testes
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Fase 35: PostgreSQL em produção (via DATABASE_URL), SQLite em desenvolvimento
+DATABASE_URL = config('DATABASE_URL', default=None)
+
+if DATABASE_URL:
+    # Produção: usar PostgreSQL via DATABASE_URL (Railway fornece automaticamente)
+    DATABASES = {
+        'default': dj_database_url.parse(DATABASE_URL)
     }
-}
+else:
+    # Desenvolvimento/Testes: usar SQLite
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -118,6 +150,16 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 
+# Fase 35: Whitenoise - Servir arquivos estáticos em produção
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -130,22 +172,29 @@ SESSION_SAVE_EVERY_REQUEST = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
 # Cache configuration
-# Fase 34: Migrado para Redis para performance
+# Fase 35: Redis via REDIS_URL em produção, localhost em desenvolvimento
+REDIS_URL = config('REDIS_URL', default='redis://127.0.0.1:6379/1')
+
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': 'redis://127.0.0.1:6379/1',
+        'LOCATION': REDIS_URL,
         'KEY_PREFIX': 'separacao_pmcell',
-        'TIMEOUT': 300,  # 5 minutos default
+        'TIMEOUT': config('CACHE_TIMEOUT', default=300, cast=int),  # 5 minutos default
     }
 }
 
 # Fase 29: Channel Layers (Redis para WebSockets)
+# Parse do REDIS_URL para extrair host e porta
+redis_url_parsed = urllib.parse.urlparse(REDIS_URL)
+redis_host = redis_url_parsed.hostname or '127.0.0.1'
+redis_port = redis_url_parsed.port or 6379
+
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": [('127.0.0.1', 6379)],
+            "hosts": [(redis_host, redis_port)],
         },
     },
 }
@@ -156,7 +205,8 @@ INTERNAL_IPS = [
     'localhost',
 ]
 
-# Configurações adicionais do Debug Toolbar
-DEBUG_TOOLBAR_CONFIG = {
-    'SHOW_TOOLBAR_CALLBACK': lambda request: DEBUG and 'test' not in sys.argv,
-}
+# Configurações adicionais do Debug Toolbar (apenas se habilitado)
+if DEBUG_TOOLBAR_ENABLED:
+    DEBUG_TOOLBAR_CONFIG = {
+        'SHOW_TOOLBAR_CALLBACK': lambda request: True,
+    }

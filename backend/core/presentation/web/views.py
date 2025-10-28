@@ -34,6 +34,37 @@ from core.domain.pedido.value_objects import Logistica, Embalagem
 logger = logging.getLogger(__name__)
 
 
+def _converter_tipo_usuario_seguro(tipo_str: str):
+    """
+    Converte string para TipoUsuario de forma segura, tratando valores legados.
+
+    Args:
+        tipo_str: String representando o tipo de usuário
+
+    Returns:
+        TipoUsuario: Enum correspondente, com fallback para SEPARADOR
+    """
+    from core.domain.usuario.entities import TipoUsuario
+
+    # Mapeamento de valores legados/alternativos
+    MAPA_TIPOS = {
+        'ADMIN': TipoUsuario.ADMINISTRADOR,
+        'ADMINISTRADOR': TipoUsuario.ADMINISTRADOR,
+        'VENDEDOR': TipoUsuario.VENDEDOR,
+        'SEPARADOR': TipoUsuario.SEPARADOR,
+        'COMPRADORA': TipoUsuario.COMPRADORA,
+    }
+
+    tipo_convertido = MAPA_TIPOS.get(tipo_str.upper() if tipo_str else '', TipoUsuario.SEPARADOR)
+
+    if tipo_str and tipo_str not in MAPA_TIPOS:
+        logger.warning(
+            f"Tipo de usuário '{tipo_str}' não reconhecido, usando fallback SEPARADOR"
+        )
+
+    return tipo_convertido
+
+
 class LoginView(View):
     """
     View de login que usa numero_login + PIN.
@@ -227,12 +258,16 @@ class DashboardView(View):
         # Obter métricas de tempo (Fase 20)
         metricas_tempo = self._obter_metricas_tempo()
 
+        # Buscar usuário completo para obter is_admin
+        usuario_obj = Usuario.objects.get(id=request.session.get('usuario_id'))
+
         # Preparar contexto
         context = {
             'usuario': {
                 'nome': request.session.get('nome'),
                 'numero_login': request.session.get('numero_login'),
                 'tipo': request.session.get('tipo'),
+                'is_admin': usuario_obj.is_admin,
             },
             'pedidos': {
                 'results': pedidos_data,
@@ -447,11 +482,36 @@ class LogoutView(View):
     View de logout - Fase 8.
 
     Limpa a sessão do usuário e redireciona para página de login.
+    Aceita tanto GET (links) quanto POST (formulários).
     """
+
+    def get(self, request):
+        """
+        Realiza logout via GET (usado por links).
+
+        Args:
+            request: HttpRequest
+
+        Returns:
+            HttpResponse: Redirect para login
+        """
+        return self._logout(request)
 
     def post(self, request):
         """
-        Realiza logout do usuário.
+        Realiza logout via POST (usado por formulários).
+
+        Args:
+            request: HttpRequest
+
+        Returns:
+            HttpResponse: Redirect para login
+        """
+        return self._logout(request)
+
+    def _logout(self, request):
+        """
+        Lógica compartilhada de logout.
 
         Args:
             request: HttpRequest
@@ -777,34 +837,67 @@ class SepararItemView(View):
             }, status=404)
 
         # Verificar se item já está separado
-        if item.separado:
-            logger.warning(f"Item {item_id} já está separado")
-            return render(request, 'partials/_erro.html', {
-                'mensagem': 'Item já está marcado como separado'
-            }, status=400)
-
-        # Marcar item como separado
+        # Se sim, desmarcar (toggle behavior)
         from django.utils import timezone
-        item.separado = True
-        item.quantidade_separada = item.quantidade_solicitada
-        item.separado_por = request.user
-        item.separado_em = timezone.now()
-        item.save()
+        if item.separado:
+            logger.info(f"Item {item_id} já está separado, desmarcando...")
 
-        logger.info(
-            f"Item {item_id} marcado como separado por {request.user.nome} "
-            f"no pedido {pedido_id}"
-        )
+            # Desmarcar item e remover TODAS as marcações
+            # Campos de separação
+            item.separado = False
+            item.quantidade_separada = 0
+            item.separado_por = None
+            item.separado_em = None
+
+            # Campos de compra
+            item.em_compra = False
+            item.enviado_para_compra_por = None
+            item.enviado_para_compra_em = None
+
+            # Campos de substituição
+            item.substituido = False
+            item.produto_substituto = None
+
+            # Campos de pedido realizado
+            item.pedido_realizado = False
+            item.realizado_por = None
+            item.realizado_em = None
+
+            item.save()
+
+            logger.info(
+                f"Item {item_id} desmarcado - todas as marcações removidas no pedido {pedido_id}"
+            )
+        else:
+            # Marcar item como separado
+            item.separado = True
+            item.quantidade_separada = item.quantidade_solicitada
+            item.separado_por = request.user
+            item.separado_em = timezone.now()
+            item.save()
+
+            logger.info(
+                f"Item {item_id} marcado como separado por {request.user.nome} "
+                f"no pedido {pedido_id}"
+            )
 
         # Calcular progresso atualizado
+        # Força refresh do queryset para pegar valores atualizados do banco
+        pedido.refresh_from_db()
         itens = list(pedido.itens.all())
         progresso_percentual = self._calcular_progresso(itens)
 
+        # Calcular contadores para WebSocket
+        itens_separados_count = sum(1 for i in itens if i.separado)
+        total_itens_count = len(itens)
+
         logger.info(
-            f"Progresso do pedido {pedido_id} atualizado: {progresso_percentual}%"
+            f"Progresso do pedido {pedido_id} atualizado: {progresso_percentual}% "
+            f"({itens_separados_count}/{total_itens_count})"
         )
 
         # Fase 30: Broadcast evento WebSocket para dashboard
+        # Payload enriquecido com contadores e item_id para atualizações em tempo real
         try:
             channel_layer = get_channel_layer()
             async_to_sync(channel_layer.group_send)(
@@ -812,12 +905,16 @@ class SepararItemView(View):
                 {
                     'type': 'item_separado',
                     'pedido_id': pedido.id,
-                    'progresso': progresso_percentual
+                    'progresso': progresso_percentual,
+                    'itens_separados': itens_separados_count,
+                    'total_itens': total_itens_count,
+                    'item_id': item_id
                 }
             )
             logger.info(
                 f"Evento WebSocket enviado: item_separado "
-                f"(pedido_id={pedido.id}, progresso={progresso_percentual}%)"
+                f"(pedido_id={pedido.id}, progresso={progresso_percentual}%, "
+                f"itens={itens_separados_count}/{total_itens_count}, item_id={item_id})"
             )
         except Exception as e:
             logger.warning(f"Erro ao enviar evento WebSocket item_separado: {e}")
@@ -1067,7 +1164,7 @@ class SubstituirItemView(View):
         usuario_domain = UsuarioDomain(
             numero_login=request.user.numero_login,
             nome=request.user.nome,
-            tipo=TipoUsuario(request.user.tipo)
+            tipo=_converter_tipo_usuario_seguro(request.user.tipo)
         )
 
         use_case = SubstituirItemUseCase()
@@ -1976,3 +2073,120 @@ class MetricasView(View):
             'data': data,
             'total_pedidos': total_pedidos
         }
+
+
+# ==========================================================
+# PAINEL DE ADMINISTRAÇÃO DE USUÁRIOS
+# ==========================================================
+
+@method_decorator(login_required, name='dispatch')
+class AdminPanelView(View):
+    """
+    View para listar todos os usuários do sistema.
+
+    Apenas administradores podem acessar.
+    """
+
+    template_name = 'admin_panel.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        """Verificar se o usuário é administrador."""
+        usuario = Usuario.objects.get(id=request.session.get('usuario_id'))
+
+        if not usuario.is_admin:
+            messages.error(request, 'Acesso negado. Apenas administradores podem acessar esta página.')
+            return redirect('dashboard')
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request):
+        """Renderiza a lista de usuários."""
+        # Buscar todos os usuários
+        usuarios = Usuario.objects.all().order_by('numero_login')
+
+        # Estatísticas
+        total_usuarios = usuarios.count()
+        por_tipo = {
+            'VENDEDOR': usuarios.filter(tipo='VENDEDOR').count(),
+            'SEPARADOR': usuarios.filter(tipo='SEPARADOR').count(),
+            'COMPRADORA': usuarios.filter(tipo='COMPRADORA').count(),
+            'ADMINISTRADOR': usuarios.filter(tipo='ADMINISTRADOR').count(),
+        }
+
+        context = {
+            'usuarios': usuarios,
+            'total_usuarios': total_usuarios,
+            'estatisticas': por_tipo,
+        }
+
+        return render(request, self.template_name, context)
+
+
+@method_decorator(login_required, name='dispatch')
+class CriarUsuarioView(View):
+    """
+    View para criar novo usuário.
+
+    Apenas administradores podem acessar.
+    """
+
+    template_name = 'criar_usuario.html'
+    form_class = None  # Será importado dinamicamente
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from core.presentation.web.forms import CriarUsuarioForm
+        self.form_class = CriarUsuarioForm
+
+    def dispatch(self, request, *args, **kwargs):
+        """Verificar se o usuário é administrador."""
+        usuario = Usuario.objects.get(id=request.session.get('usuario_id'))
+
+        if not usuario.is_admin:
+            messages.error(request, 'Acesso negado. Apenas administradores podem acessar esta página.')
+            return redirect('dashboard')
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request):
+        """Renderiza o formulário de criação."""
+        form = self.form_class()
+        return render(request, self.template_name, {'form': form})
+
+    def post(self, request):
+        """Processa a criação do usuário."""
+        form = self.form_class(request.POST)
+
+        if form.is_valid():
+            try:
+                # Extrair dados
+                numero_login = form.cleaned_data['numero_login']
+                nome = form.cleaned_data['nome']
+                tipo = form.cleaned_data['tipo']
+                pin = form.cleaned_data['pin']
+
+                # Criar usuário
+                if tipo == 'ADMINISTRADOR':
+                    usuario = Usuario.objects.create_superuser(
+                        numero_login=numero_login,
+                        nome=nome,
+                        pin=pin
+                    )
+                else:
+                    usuario = Usuario.objects.create_user(
+                        numero_login=numero_login,
+                        nome=nome,
+                        tipo=tipo,
+                        pin=pin
+                    )
+
+                logger.info(f"Usuário criado: {usuario.numero_login} - {usuario.nome} ({usuario.tipo})")
+                messages.success(request, f'Usuário {usuario.nome} criado com sucesso!')
+
+                return redirect('admin_panel')
+
+            except Exception as e:
+                logger.error(f"Erro ao criar usuário: {str(e)}")
+                messages.error(request, f'Erro ao criar usuário: {str(e)}')
+
+        return render(request, self.template_name, {'form': form})

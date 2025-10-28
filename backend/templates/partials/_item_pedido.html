@@ -18,14 +18,26 @@
     <div class="flex items-start justify-between">
         <div class="flex-1">
             <div class="flex items-center space-x-3">
-                <!-- Checkbox (desabilitado quando separado) -->
+                <!-- Checkbox (habilitado para permitir desmarcar) -->
                 <div class="flex-shrink-0">
                     <input
                         type="checkbox"
                         checked
-                        disabled
-                        class="w-5 h-5 text-green-600 border-green-300 rounded focus:ring-green-500 cursor-not-allowed opacity-75"
+                        id="checkbox-item-{{ item.id }}"
+                        hx-post="{% url 'separar_item' pedido.id item.id %}"
+                        hx-trigger="change"
+                        hx-target="#item-{{ item.id }}"
+                        hx-swap="outerHTML swap:300ms"
+                        hx-indicator="#loading-item-{{ item.id }}"
+                        class="w-5 h-5 text-green-600 border-green-300 rounded focus:ring-green-500 cursor-pointer hover:border-green-400 transition-colors"
                     />
+                    <!-- Indicador de Loading -->
+                    <div id="loading-item-{{ item.id }}" class="htmx-indicator">
+                        <svg class="animate-spin h-5 w-5 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </div>
                 </div>
 
                 <!-- Ícone -->
@@ -81,10 +93,9 @@
     <div class="flex items-start justify-between">
         <div class="flex-1">
             <div class="flex items-center space-x-3">
-                <!-- Checkbox (Fase 28: habilitado se pedido_realizado=True) -->
+                <!-- Checkbox (sempre habilitado em itens aguardando compra) -->
                 <div class="flex-shrink-0">
-                    {% if item.pedido_realizado %}
-                    <!-- Checkbox HABILITADO - Produto comprado chegou -->
+                    <!-- Checkbox HABILITADO - Permite separar item mesmo que esteja aguardando compra -->
                     <input
                         type="checkbox"
                         id="checkbox-item-{{ item.id }}"
@@ -93,23 +104,15 @@
                         hx-target="#item-{{ item.id }}"
                         hx-swap="outerHTML swap:300ms"
                         hx-indicator="#loading-item-{{ item.id }}"
-                        class="w-5 h-5 text-blue-600 border-blue-300 rounded focus:ring-blue-500 cursor-pointer hover:border-blue-400 transition-colors"
+                        class="w-5 h-5 {% if item.pedido_realizado %}text-blue-600 border-blue-300{% else %}text-orange-600 border-orange-300{% endif %} rounded focus:ring-blue-500 cursor-pointer hover:border-blue-400 transition-colors"
                     />
                     <!-- Indicador de Loading -->
                     <div id="loading-item-{{ item.id }}" class="htmx-indicator">
-                        <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <svg class="animate-spin h-5 w-5 {% if item.pedido_realizado %}text-blue-600{% else %}text-orange-600{% endif %}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                     </div>
-                    {% else %}
-                    <!-- Checkbox DESABILITADO - Aguardando compra -->
-                    <input
-                        type="checkbox"
-                        disabled
-                        class="w-5 h-5 text-orange-600 border-orange-300 rounded focus:ring-orange-500 cursor-not-allowed opacity-75"
-                    />
-                    {% endif %}
                 </div>
 
                 <!-- Ícone -->

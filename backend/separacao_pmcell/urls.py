@@ -11,8 +11,8 @@ urlpatterns = [
     path('', include('core.urls')),  # URLs do core app
 ]
 
-# Fase 34: Django Debug Toolbar (apenas em modo DEBUG)
-if settings.DEBUG:
+# Fase 34: Django Debug Toolbar (apenas em modo DEBUG e quando instalado)
+if settings.DEBUG and 'debug_toolbar' in settings.INSTALLED_APPS:
     import debug_toolbar
     urlpatterns = [
         path('__debug__/', include(debug_toolbar.urls)),

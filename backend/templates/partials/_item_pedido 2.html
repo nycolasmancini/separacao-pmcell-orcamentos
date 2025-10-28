@@ -1,0 +1,259 @@
+<!-- Partial: Item do Pedido (Fase 22 + Fase 23 + Fase 24) -->
+<!--
+    Este partial renderiza um item do pedido com 3 estados possíveis:
+    1. Separado (verde) - pode ter sido substituído (Fase 24)
+    2. Em Compra (laranja) - Fase 23
+    3. Aguardando (cinza, com menu de opções) - Fase 23 + Fase 24
+
+    Contexto esperado:
+    - item: ItemPedido (Django model)
+    - pedido: Pedido (Django model)
+    - progresso_percentual: int (opcional, para atualizar barra de progresso)
+-->
+
+{% if item.separado %}
+<!-- Item SEPARADO (Verde) -->
+<div class="item-container border border-green-200 rounded-lg p-4 bg-green-50/30 transition-all duration-300"
+     id="item-{{ item.id }}">
+    <div class="flex items-start justify-between">
+        <div class="flex-1">
+            <div class="flex items-center space-x-3">
+                <!-- Checkbox (desabilitado quando separado) -->
+                <div class="flex-shrink-0">
+                    <input
+                        type="checkbox"
+                        checked
+                        disabled
+                        class="w-5 h-5 text-green-600 border-green-300 rounded focus:ring-green-500 cursor-not-allowed opacity-75"
+                    />
+                </div>
+
+                <!-- Ícone -->
+                <div class="flex-shrink-0">
+                    <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Informações do Produto -->
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900 truncate">
+                        {{ item.produto.descricao }}
+                    </p>
+                    <p class="text-xs text-gray-500">
+                        Código: {{ item.produto.codigo }} | Qtd: {{ item.quantidade_separada }}/{{ item.quantidade_solicitada }}
+                    </p>
+                    {% if item.separado_por %}
+                    <p class="text-xs text-green-600 mt-1">
+                        ✓ Separado por {{ item.separado_por.nome }} em {{ item.separado_em|date:"d/m/Y H:i" }}
+                    </p>
+                    {% endif %}
+                    {% if item.substituido %}
+                    <p class="text-xs text-blue-600 mt-1 font-medium">
+                        🔄 Substituído por: {{ item.produto_substituto }}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Badge Separado ou Substituído -->
+        <div class="ml-4">
+            {% if item.substituido %}
+            <span class="inline-flex items-center px-2.5 py-1.5 rounded-md text-xs font-medium bg-blue-100 text-blue-800 border border-blue-300">
+                🔄 Substituído
+            </span>
+            {% else %}
+            <span class="inline-flex items-center px-2.5 py-1.5 rounded-md text-xs font-medium bg-green-100 text-green-800 border border-green-300">
+                ✓ Separado
+            </span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% elif item.em_compra %}
+<!-- Item EM COMPRA (Laranja) - Fase 23 -->
+<div class="item-container border border-orange-200 rounded-lg p-4 bg-orange-50/30 transition-all duration-300"
+     id="item-{{ item.id }}">
+    <div class="flex items-start justify-between">
+        <div class="flex-1">
+            <div class="flex items-center space-x-3">
+                <!-- Checkbox (desabilitado quando em compra) -->
+                <div class="flex-shrink-0">
+                    <input
+                        type="checkbox"
+                        disabled
+                        class="w-5 h-5 text-orange-600 border-orange-300 rounded focus:ring-orange-500 cursor-not-allowed opacity-75"
+                    />
+                </div>
+
+                <!-- Ícone -->
+                <div class="flex-shrink-0">
+                    <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Informações do Produto -->
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900 truncate">
+                        {{ item.produto.descricao }}
+                    </p>
+                    <p class="text-xs text-gray-500">
+                        Código: {{ item.produto.codigo }} | Qtd: {{ item.quantidade_solicitada }}
+                    </p>
+                    {% if item.enviado_para_compra_por %}
+                    <p class="text-xs text-orange-600 mt-1">
+                        📦 Enviado para compra por {{ item.enviado_para_compra_por.nome }} em {{ item.enviado_para_compra_em|date:"d/m/Y H:i" }}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Badge Aguardando Compra -->
+        <div class="ml-4">
+            <span class="inline-flex items-center px-2.5 py-1.5 rounded-md text-xs font-medium bg-orange-100 text-orange-800 border border-orange-300">
+                📦 Aguardando Compra
+            </span>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<!-- Item NÃO SEPARADO (Com Menu de Opções) - Fase 23 -->
+<div class="item-container border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-all duration-300"
+     id="item-{{ item.id }}"
+     x-data="{ menuOpen: false }">
+    <div class="flex items-start justify-between">
+        <div class="flex-1">
+            <div class="flex items-center space-x-3">
+                <!-- Checkbox HTMX (interativo) -->
+                <div class="flex-shrink-0">
+                    <input
+                        type="checkbox"
+                        id="checkbox-item-{{ item.id }}"
+                        hx-post="{% url 'separar_item' pedido.id item.id %}"
+                        hx-trigger="change"
+                        hx-target="#item-{{ item.id }}"
+                        hx-swap="outerHTML swap:300ms"
+                        hx-indicator="#loading-item-{{ item.id }}"
+                        class="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer hover:border-blue-400 transition-colors"
+                    />
+                    <!-- Indicador de Loading -->
+                    <div id="loading-item-{{ item.id }}" class="htmx-indicator">
+                        <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Ícone -->
+                <div class="flex-shrink-0">
+                    <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Informações do Produto -->
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900 truncate">
+                        {{ item.produto.descricao }}
+                    </p>
+                    <p class="text-xs text-gray-500">
+                        Código: {{ item.produto.codigo }} | Qtd: {{ item.quantidade_solicitada }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Menu de Opções (3 pontinhos) + Badge - Fase 23 -->
+        <div class="ml-4 flex items-center space-x-2">
+            <!-- Badge Aguardando -->
+            <span class="inline-flex items-center px-2.5 py-1.5 rounded-md text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                Aguardando
+            </span>
+
+            <!-- Botão Menu (3 pontinhos) -->
+            <div class="relative">
+                <button
+                    @click="menuOpen = !menuOpen"
+                    @click.outside="menuOpen = false"
+                    class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Mais opções"
+                >
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
+                    </svg>
+                </button>
+
+                <!-- Dropdown Menu -->
+                <div
+                    x-show="menuOpen"
+                    x-transition:enter="transition ease-out duration-100"
+                    x-transition:enter-start="transform opacity-0 scale-95"
+                    x-transition:enter-end="transform opacity-100 scale-100"
+                    x-transition:leave="transition ease-in duration-75"
+                    x-transition:leave-start="transform opacity-100 scale-100"
+                    x-transition:leave-end="transform opacity-0 scale-95"
+                    class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-10"
+                    style="display: none;"
+                >
+                    <div class="py-1">
+                        <!-- Opção: Marcar para Compra -->
+                        <button
+                            hx-post="{% url 'marcar_compra' pedido.id item.id %}"
+                            hx-trigger="click"
+                            hx-target="#item-{{ item.id }}"
+                            hx-swap="outerHTML swap:300ms"
+                            @click="menuOpen = false"
+                            class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition-colors flex items-center space-x-2"
+                        >
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                            </svg>
+                            <span>📦 Marcar para Compra</span>
+                        </button>
+
+                        <!-- Opção: Marcar como Substituído (Fase 24) -->
+                        <button
+                            hx-get="{% url 'substituir_item' pedido.id item.id %}?modal=1&produto={{ item.produto.descricao|urlencode }}"
+                            hx-trigger="click"
+                            hx-target="body"
+                            hx-swap="beforeend"
+                            @click="menuOpen = false"
+                            class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center space-x-2"
+                        >
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                            </svg>
+                            <span>🔄 Marcar como Substituído</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- CSS para htmx-indicator (esconder por padrão) -->
+<style>
+    .htmx-indicator {
+        display: none;
+    }
+    .htmx-request .htmx-indicator {
+        display: inline-block;
+    }
+    .htmx-request.htmx-indicator {
+        display: inline-block;
+    }
+</style>
