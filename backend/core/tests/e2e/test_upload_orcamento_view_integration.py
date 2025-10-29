@@ -57,11 +57,13 @@ class TestUploadOrcamentoViewIntegration(TestCase):
 
     def _criar_pdf_mock(self, nome_arquivo: str, conteudo: bytes = b'PDF MOCK') -> SimpleUploadedFile:
         """Helper para criar arquivo PDF mock."""
-        return SimpleUploadedFile(
+        pdf = SimpleUploadedFile(
             nome_arquivo,
             conteudo,
             content_type='application/pdf'
         )
+        pdf.seek(0)  # Reset file pointer to beginning
+        return pdf
 
     # ==================== TESTE 1 ====================
     def test_upload_pdf_sucesso_redireciona_dashboard(self):
@@ -82,8 +84,9 @@ class TestUploadOrcamentoViewIntegration(TestCase):
 
         pdf_file = self._criar_pdf_mock('orcamento_30703.pdf', pdf_content)
 
-        # Dados do formulário
+        # Dados do formulário (incluindo arquivo)
         form_data = {
+            'pdf_file': pdf_file,
             'logistica': 'CORREIOS',
             'embalagem': 'CAIXA',
             'observacoes': 'Teste E2E'
@@ -93,7 +96,6 @@ class TestUploadOrcamentoViewIntegration(TestCase):
         response = self.client.post(
             self.upload_url,
             data=form_data,
-            files={'pdf_file': pdf_file},
             follow=False  # Não seguir redirect automaticamente
         )
 
@@ -136,6 +138,7 @@ class TestUploadOrcamentoViewIntegration(TestCase):
         )
 
         form_data = {
+            'pdf_file': pdf_file,
             'logistica': 'CORREIOS',
             'embalagem': 'CAIXA'
         }
@@ -146,8 +149,7 @@ class TestUploadOrcamentoViewIntegration(TestCase):
         # Fazer POST
         response = self.client.post(
             self.upload_url,
-            data=form_data,
-            files={'pdf_file': pdf_file}
+            data=form_data
         )
 
         # Validações
@@ -182,17 +184,16 @@ class TestUploadOrcamentoViewIntegration(TestCase):
         with open(pdf_path, 'rb') as f:
             pdf_content = f.read()
 
-        form_data = {
+        # Primeiro upload - deve funcionar
+        pdf_file1 = self._criar_pdf_mock('orcamento_30703.pdf', pdf_content)
+        form_data1 = {
+            'pdf_file': pdf_file1,
             'logistica': 'CORREIOS',
             'embalagem': 'CAIXA'
         }
-
-        # Primeiro upload - deve funcionar
-        pdf_file1 = self._criar_pdf_mock('orcamento_30703.pdf', pdf_content)
         response1 = self.client.post(
             self.upload_url,
-            data=form_data,
-            files={'pdf_file': pdf_file1}
+            data=form_data1
         )
 
         self.assertEqual(response1.status_code, 302, "Primeiro upload deve ter sucesso")
@@ -200,10 +201,14 @@ class TestUploadOrcamentoViewIntegration(TestCase):
 
         # Segundo upload - deve falhar
         pdf_file2 = self._criar_pdf_mock('orcamento_30703_copia.pdf', pdf_content)
+        form_data2 = {
+            'pdf_file': pdf_file2,
+            'logistica': 'CORREIOS',
+            'embalagem': 'CAIXA'
+        }
         response2 = self.client.post(
             self.upload_url,
-            data=form_data,
-            files={'pdf_file': pdf_file2}
+            data=form_data2
         )
 
         # Validações
@@ -318,14 +323,14 @@ class TestUploadOrcamentoViewIntegration(TestCase):
             pdf_file = self._criar_pdf_mock('orcamento_30703.pdf', pdf_content)
 
             form_data = {
+                'pdf_file': pdf_file,
                 'logistica': 'CORREIOS',
                 'embalagem': 'CAIXA'
             }
 
             response = self.client.post(
                 self.upload_url,
-                data=form_data,
-                files={'pdf_file': pdf_file}
+                data=form_data
             )
 
             # Verificar que houve sucesso
@@ -368,13 +373,13 @@ class TestUploadOrcamentoViewIntegration(TestCase):
         pdf_file = self._criar_pdf_mock('orcamento_30703.pdf', pdf_content)
 
         form_data_sem_logistica = {
+            'pdf_file': pdf_file,
             'embalagem': 'CAIXA'
         }
 
         response2 = self.client.post(
             self.upload_url,
-            data=form_data_sem_logistica,
-            files={'pdf_file': pdf_file}
+            data=form_data_sem_logistica
         )
 
         self.assertEqual(response2.status_code, 200)
@@ -383,14 +388,14 @@ class TestUploadOrcamentoViewIntegration(TestCase):
         pdf_file2 = self._criar_pdf_mock('orcamento_30703_2.pdf', pdf_content)
 
         form_data_incompativel = {
+            'pdf_file': pdf_file2,
             'logistica': 'CORREIOS',
             'embalagem': 'SACOLA'  # Inválido para CORREIOS
         }
 
         response3 = self.client.post(
             self.upload_url,
-            data=form_data_incompativel,
-            files={'pdf_file': pdf_file2}
+            data=form_data_incompativel
         )
 
         self.assertEqual(response3.status_code, 200, "Deve retornar formulário com erro")
