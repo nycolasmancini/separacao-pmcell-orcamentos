@@ -286,19 +286,50 @@
                         return response.text();
                     })
                     .then(html => {
-                        // FASE 39c: Lista corrida única - sempre inserir em #lista-itens
+                        // FASE 39g: Atualizar item existente ou inserir novo com reordenação
                         const containerDestino = document.getElementById('lista-itens');
+                        const itemExistente = document.getElementById(`item-${item_id}`);
 
-                        if (containerDestino) {
-                            return window.ItemAnimations.insertWithAnimation(containerDestino, html);
+                        if (itemExistente) {
+                            // Caso 1: Item já existe - atualizar classes CSS e reordenar
+                            console.log(`[WebSocket] Item ${item_id} já existe, atualizando estado...`);
+
+                            // Criar elemento temporário para extrair classes atualizadas
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = html;
+                            const novoItem = tempDiv.firstElementChild;
+
+                            // Atualizar classes CSS (estado visual)
+                            itemExistente.className = novoItem.className;
+
+                            // Atualizar conteúdo interno (badges, checkboxes, etc)
+                            itemExistente.innerHTML = novoItem.innerHTML;
+
+                            // Reprocessar HTMX
+                            htmx.process(itemExistente);
+
+                            // FASE 39g: Trigger reordenação animada
+                            if (containerDestino && window.ItemAnimations && window.ItemAnimations.reordenarItemComAnimacao) {
+                                return window.ItemAnimations.reordenarItemComAnimacao(itemExistente, containerDestino)
+                                    .then(() => {
+                                        console.log(`[WebSocket] Item ${item_id} reordenado com sucesso`);
+                                        return itemExistente;
+                                    });
+                            }
+
+                            return itemExistente;
+                        } else {
+                            // Caso 2: Item novo - inserir com animação (fallback para caso raro)
+                            console.log(`[WebSocket] Item ${item_id} novo, inserindo...`);
+                            if (containerDestino) {
+                                return window.ItemAnimations.insertWithAnimation(containerDestino, html);
+                            }
+                            return null;
                         }
-                        return null;
                     })
                     .then(newItem => {
                         if (newItem) {
-                            // Reprocessar HTMX para ativar atributos hx-* do novo elemento
-                            htmx.process(newItem);
-                            console.log(`[WebSocket] Item ${item_id} atualizado com sucesso (com animações)`);
+                            console.log(`[WebSocket] Item ${item_id} processado com sucesso (com animações)`);
 
                             // FASE 38B: Validar unicidade após inserção via WebSocket
                             try {
