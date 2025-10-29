@@ -224,6 +224,52 @@ class UploadOrcamentoForm(forms.Form):
 
         return cleaned_data
 
+    def processar_pdf(self, vendedor):
+        """
+        Processa o PDF usando OrcamentoParserService e cria o pedido.
+
+        Args:
+            vendedor: Instância de Usuario (tipo VENDEDOR)
+
+        Returns:
+            Pedido: Instância do pedido criado
+
+        Raises:
+            ParserError: Se houver erro ao processar o PDF
+            DuplicatePedidoError: Se o orçamento já existe
+            VendedorNotFoundError: Se o vendedor não for encontrado
+            IntegrityValidationError: Se a validação matemática falhar
+
+        Example:
+            >>> form = UploadOrcamentoForm(data=form_data, files={'pdf_file': pdf_file})
+            >>> if form.is_valid():
+            ...     pedido = form.processar_pdf(vendedor=request.user)
+        """
+        from core.application.services.orcamento_parser_service import OrcamentoParserService
+
+        if not self.is_valid():
+            raise ValidationError('Formulário contém erros. Valide os campos antes de processar.')
+
+        # Obter dados limpos
+        pdf_file = self.cleaned_data['pdf_file']
+        logistica = self.cleaned_data['logistica']
+        embalagem = self.cleaned_data['embalagem']
+        observacoes = self.cleaned_data.get('observacoes', '')
+
+        # Criar instância do serviço
+        service = OrcamentoParserService()
+
+        # Processar PDF e criar pedido
+        pedido = service.processar_pdf_e_criar_pedido(
+            pdf_file=pdf_file,
+            vendedor=vendedor,
+            logistica=logistica,
+            embalagem=embalagem,
+            observacoes=observacoes
+        )
+
+        return pedido
+
 
 class CriarUsuarioForm(forms.Form):
     """
