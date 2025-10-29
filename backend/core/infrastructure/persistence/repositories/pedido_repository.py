@@ -377,3 +377,61 @@ class DjangoPedidoRepository(PedidoRepositoryInterface):
         except Exception as e:
             logger.error(f"Erro ao calcular tempo médio: {e}")
             raise
+
+    def obter_itens_ordenados_por_estado(self, pedido_id: int) -> List:
+        """
+        Retorna itens do pedido ordenados por estado em lista corrida (Fase 39a).
+
+        Ordem de prioridade:
+        1. Aguardando separação (separado=False, em_compra=False)
+        2. Enviados para compra (em_compra=True)
+        3. Substituídos (separado=True, substituido=True)
+        4. Separados (separado=True, substituido=False)
+
+        Dentro de cada grupo, ordenação alfabética por descrição do produto.
+
+        Args:
+            pedido_id: ID do pedido
+
+        Returns:
+            Lista de ItemPedidoDjango ordenados por estado
+
+        Example:
+            >>> repository = DjangoPedidoRepository()
+            >>> itens = repository.obter_itens_ordenados_por_estado(pedido_id=1)
+            >>> for item in itens:
+            ...     print(f"{item.produto.descricao}: {item.separado}, {item.em_compra}")
+        """
+        from django.db.models import Case, When, IntegerField
+
+        try:
+            itens = ItemPedidoDjango.objects.filter(pedido_id=pedido_id).select_related(
+                'produto', 'pedido', 'separado_por'
+            ).annotate(
+                # Calcular prioridade de ordenação baseada no estado
+                ordem_prioridade=Case(
+                    # Aguardando: separado=False AND em_compra=False
+                    When(separado=False, em_compra=False, then=1),
+                    # Em compra: em_compra=True
+                    When(em_compra=True, then=2),
+                    # Substituído: separado=True AND substituido=True
+                    When(separado=True, substituido=True, then=3),
+                    # Separado (não substituído): separado=True AND substituido=False
+                    When(separado=True, substituido=False, then=4),
+                    default=5,  # Fallback para casos não mapeados
+                    output_field=IntegerField()
+                )
+            ).order_by('ordem_prioridade', 'produto__descricao')
+
+            logger.debug(
+                f"Itens do pedido {pedido_id} ordenados por estado: "
+                f"{itens.count()} itens encontrados"
+            )
+
+            return list(itens)
+
+        except Exception as e:
+            logger.error(
+                f"Erro ao obter itens ordenados do pedido {pedido_id}: {e}"
+            )
+            raise
