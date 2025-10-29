@@ -15,6 +15,10 @@
     const ANIMATION_DURATION = 250; // ms - sincronizado com CSS --animation-speed-fast
     const ANIMATION_EASE = 'cubic-bezier(0.4, 0, 0.2, 1)';
 
+    // FASE 38: Controle de ações locais para evitar duplicação via WebSocket
+    // Map: item_id (string) -> timestamp (number)
+    const localActionInProgress = new Map();
+
     /**
      * Aplica fade out em um elemento e retorna Promise
      * @param {HTMLElement} element - Elemento para fazer fade out
@@ -138,11 +142,9 @@
 
                     console.log(`[Animations] Swap interceptado para item ${itemId}, aplicando lógica customizada`);
 
-                    // 1. Fade out do item atual
-                    fadeOutAndRemove(target)
+                    // FASE 38B: Remover de TODOS os containers antes de inserir
+                    removerItemCompletamente(itemId)
                         .then(() => {
-                            target.remove();
-
                             // 2. Detectar container destino baseado no HTML
                             const containerDestinoId = detectarContainerDestino(html);
                             const containerDestino = document.getElementById(containerDestinoId);
@@ -164,8 +166,25 @@
                                 }
                                 console.log(`[Animations] Item ${itemId} movido com sucesso via intercepção HTMX`);
 
+                                // FASE 38B: Validar unicidade após inserção
+                                try {
+                                    validarUnicidadeItem(itemId);
+                                } catch (error) {
+                                    console.error(`[Animations] ${error.message}`);
+                                }
+
                                 // Atualizar badges
                                 updateBadges();
+
+                                // FASE 38: Marcar ação local em progresso
+                                localActionInProgress.set(itemId, Date.now());
+                                console.log(`[Animations] Flag local marcada para item ${itemId}`);
+
+                                // Limpar flag após 2 segundos
+                                setTimeout(() => {
+                                    localActionInProgress.delete(itemId);
+                                    console.log(`[Animations] Flag local removida para item ${itemId}`);
+                                }, 2000);
                             }
                         })
                         .catch(error => {
@@ -245,19 +264,19 @@
 
             console.log(`[Animations] Movendo item-${itemId} de volta para não-separados`);
 
-            // 2. Localizar elemento no DOM
-            const itemElement = document.getElementById(`item-${itemId}`);
+            // FASE 38: Marcar que ação local está em progresso (evitar duplicação via WebSocket)
+            localActionInProgress.set(itemId, Date.now());
+            console.log(`[Animations] Flag local marcada para item ${itemId} (desmarcar)`);
 
-            if (!itemElement) {
-                console.warn(`[Animations] Item #item-${itemId} não encontrado no DOM`);
+            // FASE 38B: Remover de TODOS os containers (não apenas primeiro encontrado)
+            const removedElements = await removerItemCompletamente(itemId);
+
+            if (removedElements.length === 0) {
+                console.warn(`[Animations] Item #item-${itemId} não encontrado em nenhum container`);
+                // Limpar flag mesmo que item não tenha sido encontrado
+                localActionInProgress.delete(itemId);
                 return;
             }
-
-            // 3. Aplicar fade out
-            await fadeOutAndRemove(itemElement);
-
-            // 4. Remover completamente do DOM
-            itemElement.remove();
 
             // 5. Buscar HTML FRESCO via GET (endpoint dedicado)
             try {
@@ -303,10 +322,23 @@
                     }
 
                     console.log(`[Animations] Item ${itemId} movido de volta para não-separados com HTML fresco`);
+
+                    // FASE 38B: Validar que item é único no DOM após inserção
+                    try {
+                        validarUnicidadeItem(itemId);
+                    } catch (error) {
+                        console.error(`[Animations] ${error.message}`);
+                    }
                 }
 
                 // 8. Atualizar badges
                 updateBadges();
+
+                // FASE 38: Limpar flag após delay
+                setTimeout(() => {
+                    localActionInProgress.delete(itemId);
+                    console.log(`[Animations] Flag local removida para item ${itemId} (desmarcar)`);
+                }, 2000);
 
             } catch (error) {
                 console.error(`[Animations] Erro ao buscar HTML fresco do item ${itemId}:`, error);
@@ -397,6 +429,203 @@
     }
 
     /**
+     * FASE 38B: Remove TODAS as ocorrências de um item do DOM (em qualquer container)
+     *
+     * Correção de Bug: getElementById() retorna apenas primeira ocorrência,
+     * causando duplicação quando item existia em múltiplos containers.
+     *
+     * Esta função busca item em TODOS os containers conhecidos e remove todas
+     * as ocorrências encontradas, garantindo que item seja único antes de inserção.
+     *
+     * @param {string|number} itemId - ID do item a remover
+     * @returns {Promise<Array<HTMLElement>>} - Promise com array de elementos removidos
+     */
+    async function removerItemCompletamente(itemId) {
+        const itemIdStr = String(itemId);
+        const removedElements = [];
+
+        console.log(`[Animations] 🔍 Buscando todas as ocorrências de item-${itemIdStr}...`);
+
+        // Lista de containers onde item pode estar
+        const containerIds = [
+            'container-separados',
+            'container-nao-separados'
+        ];
+
+        // Buscar e remover de todos os containers
+        for (const containerId of containerIds) {
+            const container = document.getElementById(containerId);
+            if (!container) {
+                console.warn(`[Animations] Container ${containerId} não encontrado`);
+                continue;
+            }
+
+            const item = container.querySelector(`#item-${itemIdStr}`);
+            if (item) {
+                console.log(`[Animations] 🗑️  Removendo item-${itemIdStr} de ${containerId}`);
+
+                // Aplicar fade out antes de remover
+                await fadeOutAndRemove(item);
+                item.remove();
+
+                removedElements.push(item);
+            }
+        }
+
+        const totalRemovidos = removedElements.length;
+
+        if (totalRemovidos === 0) {
+            console.warn(`[Animations] ⚠️  Nenhuma ocorrência de item-${itemIdStr} encontrada para remover`);
+        } else if (totalRemovidos > 1) {
+            console.warn(
+                `[Animations] ⚠️  DUPLICAÇÃO DETECTADA: Removidas ${totalRemovidos} ` +
+                `ocorrências de item-${itemIdStr} (deveria ter apenas 1)`
+            );
+        } else {
+            console.log(`[Animations] ✅ Item-${itemIdStr} removido com sucesso (1 ocorrência)`);
+        }
+
+        return removedElements;
+    }
+
+    /**
+     * FASE 38B: Valida que existe apenas UMA ocorrência do item no DOM
+     *
+     * IDs devem ser únicos no DOM. Se item estiver duplicado, lança erro
+     * para detectar bugs de sincronização.
+     *
+     * @param {string|number} itemId - ID do item a validar
+     * @throws {Error} Se encontrar duplicatas no DOM
+     */
+    function validarUnicidadeItem(itemId) {
+        const itemIdStr = String(itemId);
+        const elementos = document.querySelectorAll(`[id="item-${itemIdStr}"]`);
+
+        if (elementos.length === 0) {
+            console.warn(`[Animations] ⚠️  Item-${itemIdStr} não encontrado no DOM`);
+            return;
+        }
+
+        if (elementos.length > 1) {
+            console.error(
+                `[Animations] ❌ ERRO CRÍTICO: DUPLICAÇÃO DE ITEM DETECTADA!\n` +
+                `   Item-${itemIdStr} aparece ${elementos.length} vezes no DOM (deveria ser 1)`
+            );
+
+            // Log detalhado de onde estão os duplicados
+            elementos.forEach((el, index) => {
+                const container = el.closest('[id^="container-"]');
+                const containerName = container ? container.id : 'container desconhecido';
+                console.error(`   ${index + 1}. ${containerName}`);
+            });
+
+            throw new Error(
+                `Duplicação de item detectada: item-${itemIdStr} existe ` +
+                `${elementos.length} vezes no DOM`
+            );
+        }
+
+        console.log(`[Animations] ✅ Item-${itemIdStr} é único no DOM`);
+    }
+
+    /**
+     * FASE 39D: Detecta o estado de um item baseado nas classes CSS
+     * @param {HTMLElement} element - Elemento do item
+     * @returns {string} - Estado: 'aguardando', 'compra', 'substituido', 'separado'
+     */
+    function detectarEstadoItem(element) {
+        if (!element) {
+            console.warn('[Animations] detectarEstadoItem: elemento não fornecido');
+            return 'desconhecido';
+        }
+
+        // Ordem de verificação alinhada com backend (Fase 39a):
+        // 1. Aguardando (cinza)
+        if (element.classList.contains('border-gray-200')) {
+            return 'aguardando';
+        }
+        // 2. Em compra (laranja)
+        if (element.classList.contains('border-orange-200')) {
+            return 'compra';
+        }
+        // 3. Substituído (azul)
+        if (element.classList.contains('border-blue-200')) {
+            return 'substituido';
+        }
+        // 4. Separado (verde)
+        if (element.classList.contains('border-green-200')) {
+            return 'separado';
+        }
+
+        console.warn('[Animations] Estado desconhecido para item:', element);
+        return 'desconhecido';
+    }
+
+    /**
+     * FASE 39D: Calcula a posição de destino para um item na lista corrida
+     * @param {string} estado - Estado do item ('aguardando', 'compra', 'substituido', 'separado')
+     * @param {string} descricao - Descrição do produto (para ordenação alfabética)
+     * @param {HTMLElement} container - Container #lista-itens
+     * @returns {number} - Índice de destino (0-based)
+     */
+    function calcularPosicaoDestino(estado, descricao, container) {
+        if (!container) {
+            console.error('[Animations] calcularPosicaoDestino: container não fornecido');
+            return 0;
+        }
+
+        // Mapa de prioridades (alinhado com backend)
+        const prioridades = {
+            'aguardando': 1,
+            'compra': 2,
+            'substituido': 3,
+            'separado': 4,
+            'desconhecido': 5
+        };
+
+        const minhaPrioridade = prioridades[estado] || 5;
+        const minhaDescricaoNorm = (descricao || '').trim().toLowerCase();
+
+        let posicaoDestino = 0;
+        const itens = Array.from(container.children);
+
+        for (let i = 0; i < itens.length; i++) {
+            const child = itens[i];
+            const childEstado = detectarEstadoItem(child);
+            const childPrioridade = prioridades[childEstado] || 5;
+
+            // Se child tem prioridade menor (vem antes), incrementar posição
+            if (childPrioridade < minhaPrioridade) {
+                posicaoDestino++;
+                continue;
+            }
+
+            // Se child tem prioridade maior (vem depois), parar
+            if (childPrioridade > minhaPrioridade) {
+                break;
+            }
+
+            // Mesma prioridade: ordenar alfabeticamente por descrição
+            const descEl = child.querySelector('.font-semibold.text-gray-900') ||
+                           child.querySelector('[class*="font-semibold"]');
+            const childDescricao = descEl ? descEl.textContent.trim().toLowerCase() : '';
+
+            if (minhaDescricaoNorm > childDescricao) {
+                posicaoDestino++;
+            } else {
+                // Nossa descrição vem antes alfabeticamente, parar aqui
+                break;
+            }
+        }
+
+        console.log(
+            `[Animations] Posição calculada para "${descricao}" (${estado}): ${posicaoDestino}/${itens.length}`
+        );
+
+        return posicaoDestino;
+    }
+
+    /**
      * Inicializa o sistema de animações
      */
     function init() {
@@ -409,6 +638,26 @@
             insertWithAnimation,
             moveItemWithAnimation,
             animateBadgeUpdate,
+            // FASE 38: Expor função para verificar se ação local está em progresso
+            isLocalActionInProgress: (itemId) => {
+                // Converter para string se necessário
+                const itemIdStr = String(itemId);
+                const isInProgress = localActionInProgress.has(itemIdStr);
+
+                if (isInProgress) {
+                    const timestamp = localActionInProgress.get(itemIdStr);
+                    const elapsed = Date.now() - timestamp;
+                    console.log(`[Animations] Verificando flag para item ${itemIdStr}: em progresso (${elapsed}ms atrás)`);
+                }
+
+                return isInProgress;
+            },
+            // FASE 38B: Expor novas funções de remoção completa e validação
+            removerItemCompletamente,
+            validarUnicidadeItem,
+            // FASE 39D: Expor funções de detecção de estado e cálculo de posição
+            detectarEstadoItem,
+            calcularPosicaoDestino,
             ANIMATION_DURATION
         };
     }

@@ -529,6 +529,103 @@
     }
 
     /**
+     * FASE 39D: Detecta o estado de um item baseado nas classes CSS
+     * @param {HTMLElement} element - Elemento do item
+     * @returns {string} - Estado: 'aguardando', 'compra', 'substituido', 'separado'
+     */
+    function detectarEstadoItem(element) {
+        if (!element) {
+            console.warn('[Animations] detectarEstadoItem: elemento não fornecido');
+            return 'desconhecido';
+        }
+
+        // Ordem de verificação alinhada com backend (Fase 39a):
+        // 1. Aguardando (cinza)
+        if (element.classList.contains('border-gray-200')) {
+            return 'aguardando';
+        }
+        // 2. Em compra (laranja)
+        if (element.classList.contains('border-orange-200')) {
+            return 'compra';
+        }
+        // 3. Substituído (azul)
+        if (element.classList.contains('border-blue-200')) {
+            return 'substituido';
+        }
+        // 4. Separado (verde)
+        if (element.classList.contains('border-green-200')) {
+            return 'separado';
+        }
+
+        console.warn('[Animations] Estado desconhecido para item:', element);
+        return 'desconhecido';
+    }
+
+    /**
+     * FASE 39D: Calcula a posição de destino para um item na lista corrida
+     * @param {string} estado - Estado do item ('aguardando', 'compra', 'substituido', 'separado')
+     * @param {string} descricao - Descrição do produto (para ordenação alfabética)
+     * @param {HTMLElement} container - Container #lista-itens
+     * @returns {number} - Índice de destino (0-based)
+     */
+    function calcularPosicaoDestino(estado, descricao, container) {
+        if (!container) {
+            console.error('[Animations] calcularPosicaoDestino: container não fornecido');
+            return 0;
+        }
+
+        // Mapa de prioridades (alinhado com backend)
+        const prioridades = {
+            'aguardando': 1,
+            'compra': 2,
+            'substituido': 3,
+            'separado': 4,
+            'desconhecido': 5
+        };
+
+        const minhaPrioridade = prioridades[estado] || 5;
+        const minhaDescricaoNorm = (descricao || '').trim().toLowerCase();
+
+        let posicaoDestino = 0;
+        const itens = Array.from(container.children);
+
+        for (let i = 0; i < itens.length; i++) {
+            const child = itens[i];
+            const childEstado = detectarEstadoItem(child);
+            const childPrioridade = prioridades[childEstado] || 5;
+
+            // Se child tem prioridade menor (vem antes), incrementar posição
+            if (childPrioridade < minhaPrioridade) {
+                posicaoDestino++;
+                continue;
+            }
+
+            // Se child tem prioridade maior (vem depois), parar
+            if (childPrioridade > minhaPrioridade) {
+                break;
+            }
+
+            // Mesma prioridade: ordenar alfabeticamente por descrição
+            const descEl = child.querySelector('.font-semibold.text-gray-900') ||
+                           child.querySelector('[class*="font-semibold"]');
+            const childDescricao = descEl ? descEl.textContent.trim().toLowerCase() : '';
+
+            if (minhaDescricaoNorm > childDescricao) {
+                posicaoDestino++;
+            } else {
+                // Nossa descrição vem antes alfabeticamente, parar aqui
+                break;
+            }
+        }
+
+        console.log(
+            `[Animations] Posição calculada para "${descricao}" (${estado}): ${posicaoDestino}/${itens.length}`
+        );
+
+        return posicaoDestino;
+    }
+
+    /**
      * Inicializa o sistema de animações
      */
     function init() {
@@ -558,6 +655,9 @@
             // FASE 38B: Expor novas funções de remoção completa e validação
             removerItemCompletamente,
             validarUnicidadeItem,
+            // FASE 39D: Expor funções de detecção de estado e cálculo de posição
+            detectarEstadoItem,
+            calcularPosicaoDestino,
             ANIMATION_DURATION
         };
     }
