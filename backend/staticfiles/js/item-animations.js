@@ -673,37 +673,45 @@
                 return;
             }
 
-            // 4. Aplicar fade out
-            itemElement.classList.add('item-fade-out', 'item-reordering');
+            // FASE 39I: Otimização com requestAnimationFrame para 60 FPS
 
-            // 5. Aguardar animação de fade out
-            setTimeout(() => {
-                // 6. Remover item do DOM
-                itemElement.remove();
+            // 4. Aplicar fade out usando RAF para próximo frame
+            requestAnimationFrame(() => {
+                itemElement.classList.add('item-fade-out', 'item-reordering');
 
-                // 7. Inserir na nova posição
-                const itensAtuais = Array.from(container.children);
-
-                if (posicaoDestino >= itensAtuais.length) {
-                    // Inserir no final
-                    container.appendChild(itemElement);
-                } else {
-                    // Inserir antes do item na posição destino
-                    container.insertBefore(itemElement, itensAtuais[posicaoDestino]);
-                }
-
-                // 8. Remover classes de animação e aplicar fade in
-                itemElement.classList.remove('item-fade-out', 'item-reordering');
-                itemElement.classList.add('item-fade-in');
-
-                // 9. Aguardar fade in completar
+                // 5. Aguardar animação de fade out
                 setTimeout(() => {
-                    itemElement.classList.remove('item-fade-in');
-                    console.log('[Animations] Reordenação completa');
-                    resolve();
-                }, ANIMATION_DURATION);
+                    // 6. Remover e reinserir usando RAF para evitar layout thrashing
+                    requestAnimationFrame(() => {
+                        // Remover item do DOM
+                        itemElement.remove();
 
-            }, ANIMATION_DURATION);
+                        // 7. Inserir na nova posição
+                        const itensAtuais = Array.from(container.children);
+
+                        if (posicaoDestino >= itensAtuais.length) {
+                            // Inserir no final
+                            container.appendChild(itemElement);
+                        } else {
+                            // Inserir antes do item na posição destino
+                            container.insertBefore(itemElement, itensAtuais[posicaoDestino]);
+                        }
+
+                        // 8. Aplicar fade in no próximo frame
+                        requestAnimationFrame(() => {
+                            itemElement.classList.remove('item-fade-out', 'item-reordering');
+                            itemElement.classList.add('item-fade-in');
+
+                            // 9. Aguardar fade in completar
+                            setTimeout(() => {
+                                itemElement.classList.remove('item-fade-in');
+                                console.log('[Animations] Reordenação completa');
+                                resolve();
+                            }, ANIMATION_DURATION);
+                        });
+                    });
+                }, ANIMATION_DURATION);
+            });
         });
     }
 
