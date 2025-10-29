@@ -5,6 +5,7 @@ Fase 7: LoginView e Dashboard Placeholder
 Fase 8: LogoutView
 Fase 15: UploadOrcamentoView
 Fase 30: WebSocket Broadcast
+Fase 4 (Parser Integration): UploadOrcamentoView modificada para usar novo parser
 """
 import logging
 import tempfile
@@ -30,6 +31,14 @@ from core.application.dtos.pedido_dtos import CriarPedidoRequestDTO
 from core.infrastructure.pdf.parser import PDFParser, PDFHeaderExtractor, PDFProductExtractor
 from core.infrastructure.persistence.repositories.pedido_repository import DjangoPedidoRepository
 from core.domain.pedido.value_objects import Logistica, Embalagem
+
+# Fase 4: Import de exceções do novo parser service
+from core.application.services.exceptions import (
+    DuplicatePedidoError,
+    VendedorNotFoundError,
+    IntegrityValidationError
+)
+from core.infrastructure.parsers.pdf_orcamento_parser import ParserError
 
 logger = logging.getLogger(__name__)
 
@@ -566,7 +575,10 @@ class UploadOrcamentoView(View):
 
     def post(self, request):
         """
-        Processa upload de PDF e cria pedido.
+        Processa upload de PDF e cria pedido usando novo parser service.
+
+        FASE 4: Modificado para usar UploadOrcamentoForm.processar_pdf()
+        que integra com OrcamentoParserService (Fases 1-3).
 
         Args:
             request: HttpRequest
@@ -580,105 +592,84 @@ class UploadOrcamentoView(View):
             logger.warning(f"Formulário de upload inválido: {form.errors}")
             return render(request, self.template_name, {'form': form})
 
-        # Extrair dados do formulário
-        pdf_file = form.cleaned_data['pdf_file']
-        logistica = Logistica(form.cleaned_data['logistica'])
-        embalagem = Embalagem(form.cleaned_data['embalagem'])
-        observacoes = form.cleaned_data.get('observacoes', '')
-
-        # Salvar arquivo temporariamente
-        temp_file = None
         try:
-            # Criar arquivo temporário
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
-                for chunk in pdf_file.chunks():
-                    tmp.write(chunk)
-                temp_file = tmp.name
+            # FASE 4: Usar form.processar_pdf() que integra com OrcamentoParserService
+            pedido = form.processar_pdf(vendedor=request.user)
 
-            logger.info(f"Arquivo PDF salvo temporariamente: {temp_file}")
-
-            # Criar DTO de request
-            request_dto = CriarPedidoRequestDTO(
-                pdf_path=temp_file,
-                logistica=logistica,
-                embalagem=embalagem,
-                usuario_criador_id=request.user.id,
-                observacoes=observacoes
+            logger.info(
+                f"Pedido criado com sucesso via novo parser: "
+                f"{pedido.numero_orcamento} (ID: {pedido.id})"
             )
 
-            # Executar use case
-            pdf_parser = PDFParser()
-            header_extractor = PDFHeaderExtractor()
-            product_extractor = PDFProductExtractor()
-            pedido_repository = DjangoPedidoRepository()
+            # Fase 30: Broadcast evento WebSocket para dashboard
+            try:
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    'dashboard',
+                    {
+                        'type': 'pedido_criado',
+                        'pedido_id': pedido.id
+                    }
+                )
+                logger.info(f"Evento WebSocket enviado: pedido_criado (ID: {pedido.id})")
+            except Exception as e:
+                logger.warning(f"Erro ao enviar evento WebSocket pedido_criado: {e}")
 
-            use_case = CriarPedidoUseCase(
-                pdf_parser=pdf_parser,
-                header_extractor=header_extractor,
-                product_extractor=product_extractor,
-                pedido_repository=pedido_repository
+            messages.success(
+                request,
+                f'Pedido #{pedido.numero_orcamento} criado com sucesso!'
             )
+            return redirect('dashboard')
 
-            response_dto = use_case.execute(request_dto)
-
-            if response_dto.success:
-                logger.info(
-                    f"Pedido criado com sucesso: {response_dto.pedido.numero_orcamento} "
-                    f"(ID: {response_dto.pedido.id})"
-                )
-
-                # Fase 30: Broadcast evento WebSocket para dashboard
-                try:
-                    channel_layer = get_channel_layer()
-                    async_to_sync(channel_layer.group_send)(
-                        'dashboard',
-                        {
-                            'type': 'pedido_criado',
-                            'pedido_id': response_dto.pedido.id
-                        }
-                    )
-                    logger.info(f"Evento WebSocket enviado: pedido_criado (ID: {response_dto.pedido.id})")
-                except Exception as e:
-                    logger.warning(f"Erro ao enviar evento WebSocket pedido_criado: {e}")
-
-                messages.success(
-                    request,
-                    f'Pedido #{response_dto.pedido.numero_orcamento} criado com sucesso!'
-                )
-                return redirect('dashboard')
-            else:
-                logger.error(
-                    f"Erro ao criar pedido: {response_dto.error_message}. "
-                    f"Validações: {response_dto.validation_errors}"
-                )
-                messages.error(
-                    request,
-                    f'Erro ao criar pedido: {response_dto.error_message}'
-                )
-
-                # Adicionar erros de validação ao contexto
-                context = {
-                    'form': form,
-                    'validation_errors': response_dto.validation_errors
-                }
-                return render(request, self.template_name, context)
-
-        except Exception as e:
-            logger.exception(f"Erro inesperado ao processar upload: {e}")
+        except DuplicatePedidoError as e:
+            # Orçamento duplicado - exibir mensagem amigável
+            logger.warning(f"Tentativa de upload de orçamento duplicado: {e.numero_orcamento}")
             messages.error(
                 request,
-                f'Erro ao processar PDF: {str(e)}'
+                f'Este orçamento já existe no sistema (#{e.numero_orcamento}). '
+                f'Verifique o dashboard ou histórico.'
             )
             return render(request, self.template_name, {'form': form})
 
-        finally:
-            # Limpar arquivo temporário
-            if temp_file and os.path.exists(temp_file):
-                try:
-                    os.unlink(temp_file)
-                    logger.debug(f"Arquivo temporário removido: {temp_file}")
-                except Exception as e:
-                    logger.warning(f"Erro ao remover arquivo temporário {temp_file}: {e}")
+        except VendedorNotFoundError as e:
+            # Vendedor do PDF não encontrado no sistema
+            logger.error(f"Vendedor não encontrado no PDF: {e.nome_vendedor}")
+            messages.error(
+                request,
+                f'Vendedor "{e.nome_vendedor}" não encontrado no sistema. '
+                f'Entre em contato com o administrador.'
+            )
+            return render(request, self.template_name, {'form': form})
+
+        except IntegrityValidationError as e:
+            # Falha na validação matemática do PDF
+            logger.error(f"Falha de integridade no PDF: {e.message}")
+            messages.error(
+                request,
+                f'Erro na validação do PDF: {e.message}. '
+                f'Verifique se o PDF está correto ou entre em contato com o suporte.'
+            )
+            return render(request, self.template_name, {'form': form})
+
+        except ParserError as e:
+            # Erro ao fazer parsing do PDF (corrompido, formato inválido, etc.)
+            logger.error(f"Erro ao fazer parsing do PDF: {str(e)}")
+            messages.error(
+                request,
+                f'Erro ao processar PDF: {str(e)}. '
+                f'Verifique se o arquivo está correto e tente novamente.'
+            )
+            return render(request, self.template_name, {'form': form})
+
+        except Exception as e:
+            # Erro inesperado - logar com stacktrace
+            logger.exception(f"Erro inesperado ao processar upload: {e}")
+            messages.error(
+                request,
+                f'Erro inesperado ao processar PDF: {str(e)}. '
+                f'Entre em contato com o suporte técnico.'
+            )
+            return render(request, self.template_name, {'form': form})
 
 
 @method_decorator(login_required, name='dispatch')
