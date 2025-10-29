@@ -289,6 +289,9 @@ class Pedido:
         """
         Calcula o percentual de progresso da separação.
 
+        Conta itens separados E substituídos, pois ambos representam
+        itens "resolvidos" na separação.
+
         Returns:
             Percentual de 0 a 100 representando quantos itens foram separados
 
@@ -303,8 +306,9 @@ class Pedido:
         if not self.itens:
             return 0
 
-        itens_separados = sum(1 for item in self.itens if item.separado)
-        progresso = (itens_separados / len(self.itens)) * 100
+        # Contar itens separados OU substituídos
+        itens_concluidos = sum(1 for item in self.itens if item.separado or item.substituido)
+        progresso = (itens_concluidos / len(self.itens)) * 100
 
         return int(progresso)
 

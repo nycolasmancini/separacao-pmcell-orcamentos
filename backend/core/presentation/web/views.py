@@ -399,15 +399,18 @@ class DashboardView(View):
 
     def _contar_itens_separados(self, itens):
         """
-        Conta quantos itens foram separados.
+        Conta quantos itens foram separados ou substituídos.
+
+        Itens substituídos também contam como "separados" pois
+        representam itens resolvidos na separação.
 
         Args:
             itens: QuerySet de ItemPedido
 
         Returns:
-            int: Número de itens separados
+            int: Número de itens separados ou substituídos
         """
-        return sum(1 for item in itens if item.separado)
+        return sum(1 for item in itens if item.separado or item.substituido)
 
     def _calcular_progresso(self, itens):
         """
@@ -684,6 +687,7 @@ class DetalhePedidoView(View):
     View para exibir detalhes de um pedido específico.
 
     Fase 21: Visualização detalhada com itens separados e não separados.
+    Fase 39b: Lista corrida única com itens ordenados por estado.
 
     Methods:
         get: Renderiza template com detalhes do pedido
@@ -695,6 +699,12 @@ class DetalhePedidoView(View):
         """
         Renderiza detalhes de um pedido.
 
+        Fase 39b: Retorna lista única de itens ordenados por estado:
+        1. Aguardando separação (alfabética)
+        2. Enviados para compras (alfabética)
+        3. Substituídos (alfabética)
+        4. Separados (alfabética)
+
         Args:
             request: HttpRequest
             pedido_id: ID do pedido
@@ -704,37 +714,43 @@ class DetalhePedidoView(View):
         """
         from django.shortcuts import get_object_or_404
         from core.models import Pedido
-        from django.utils import timezone
+        from core.infrastructure.persistence.repositories.pedido_repository import (
+            DjangoPedidoRepository
+        )
 
         logger.info(f"Usuário {request.user.nome} acessou detalhes do pedido #{pedido_id}")
 
         # Buscar pedido com otimizações de query
         pedido = get_object_or_404(
-            Pedido.objects.select_related('vendedor').prefetch_related('itens__produto'),
+            Pedido.objects.select_related('vendedor'),
             id=pedido_id
         )
 
-        # Separar itens em duas listas
-        itens = list(pedido.itens.all())
-        itens_nao_separados = [item for item in itens if not item.separado]
-        itens_separados = [item for item in itens if item.separado]
+        # Fase 39b: Usar repositório para obter itens ordenados por estado
+        repository = DjangoPedidoRepository()
+        itens = repository.obter_itens_ordenados_por_estado(pedido_id)
 
         # Calcular métricas
         tempo_decorrido_minutos = self._calcular_tempo_decorrido(pedido)
         progresso_percentual = self._calcular_progresso(itens)
 
+        # Calcular contadores para o template
+        total_itens = len(itens)
+        itens_separados_count = sum(1 for item in itens if item.separado)
+
         context = {
             'pedido': pedido,
-            'itens_nao_separados': itens_nao_separados,
-            'itens_separados': itens_separados,
+            'itens': itens,  # Fase 39b: Lista única ordenada
             'tempo_decorrido_minutos': tempo_decorrido_minutos,
             'progresso_percentual': progresso_percentual,
+            'total_itens': total_itens,
+            'itens_separados_count': itens_separados_count,
             'usuario': request.user
         }
 
         logger.debug(
-            f"Pedido #{pedido_id}: {len(itens_nao_separados)} não separados, "
-            f"{len(itens_separados)} separados, progresso {progresso_percentual}%"
+            f"Pedido #{pedido_id}: {len(itens)} itens ordenados por estado, "
+            f"progresso {progresso_percentual}%"
         )
 
         return render(request, self.template_name, context)
@@ -761,6 +777,9 @@ class DetalhePedidoView(View):
         """
         Calcula progresso percentual da separação.
 
+        Conta itens separados E substituídos, pois ambos representam
+        itens "resolvidos" na separação.
+
         Args:
             itens: Lista de ItemPedido
 
@@ -771,8 +790,9 @@ class DetalhePedidoView(View):
         if total_itens == 0:
             return 0
 
-        itens_separados = sum(1 for item in itens if item.separado)
-        return int((itens_separados / total_itens) * 100)
+        # Contar itens separados OU substituídos
+        itens_concluidos = sum(1 for item in itens if item.separado or item.substituido)
+        return int((itens_concluidos / total_itens) * 100)
 
 
 # ==================== FASE 22: SEPARAR ITEM ====================
@@ -897,6 +917,7 @@ class SepararItemView(View):
         )
 
         # Fase 30: Broadcast evento WebSocket para dashboard
+        # Fase 38: Adicionar flag item_separado para corrigir bug de desmarcação
         # Payload enriquecido com contadores e item_id para atualizações em tempo real
         try:
             channel_layer = get_channel_layer()
@@ -908,27 +929,56 @@ class SepararItemView(View):
                     'progresso': progresso_percentual,
                     'itens_separados': itens_separados_count,
                     'total_itens': total_itens_count,
-                    'item_id': item_id
+                    'item_id': item_id,
+                    'item_separado': item.separado  # Fase 38: Flag para determinar container destino
                 }
             )
             logger.info(
                 f"Evento WebSocket enviado: item_separado "
                 f"(pedido_id={pedido.id}, progresso={progresso_percentual}%, "
-                f"itens={itens_separados_count}/{total_itens_count}, item_id={item_id})"
+                f"itens={itens_separados_count}/{total_itens_count}, "
+                f"item_id={item_id}, item_separado={item.separado})"
             )
         except Exception as e:
             logger.warning(f"Erro ao enviar evento WebSocket item_separado: {e}")
 
-        # Renderizar partial atualizado do item
-        return render(request, 'partials/_item_pedido.html', {
+        # Fase 37 - Correção de Bug: Quando item é DESMARCADO (separado → False),
+        # retornar apenas confirmação sem HTML para evitar swap in-place do HTMX.
+        # JavaScript irá buscar HTML fresco via GET.
+        if not item.separado:
+            # Item foi DESMARCADO - retornar apenas confirmação
+            from django.http import HttpResponse
+            response = HttpResponse(status=200)
+            response['HX-Trigger'] = 'itemDesmarcado'
+            response['X-Item-Id'] = str(item_id)
+            response['X-Item-State-Changed'] = 'nao-separado'
+
+            logger.info(
+                f"Item {item_id} desmarcado - retornando confirmação "
+                f"(JavaScript buscará HTML fresco)"
+            )
+
+            return response
+
+        # Item foi MARCADO como separado - renderizar partial atualizado normalmente
+        response = render(request, 'partials/_item_pedido.html', {
             'item': item,
             'pedido': pedido,
             'progresso_percentual': progresso_percentual
         })
 
+        # Adicionar headers customizados (Fase 37 - Animações)
+        response['HX-Trigger'] = 'itemSeparado'
+        response['X-Item-State-Changed'] = 'separado'
+
+        return response
+
     def _calcular_progresso(self, itens):
         """
         Calcula progresso percentual da separação.
+
+        Conta itens separados E substituídos, pois ambos representam
+        itens "resolvidos" na separação.
 
         Args:
             itens: Lista de ItemPedido
@@ -940,8 +990,9 @@ class SepararItemView(View):
         if total_itens == 0:
             return 0
 
-        itens_separados = sum(1 for item in itens if item.separado)
-        return int((itens_separados / total_itens) * 100)
+        # Contar itens separados OU substituídos
+        itens_concluidos = sum(1 for item in itens if item.separado or item.substituido)
+        return int((itens_concluidos / total_itens) * 100)
 
 
 class MarcarParaCompraView(View):
@@ -1043,6 +1094,36 @@ class MarcarParaCompraView(View):
             f"Item {item_id} marcado para compra com sucesso "
             f"por {request.user.nome}"
         )
+
+        # Fase 35: Broadcast evento WebSocket para atualização em tempo real
+        try:
+            channel_layer = get_channel_layer()
+
+            # Calcular progresso (itens marcados para compra não afetam progresso)
+            pedido = item.pedido
+            pedido.refresh_from_db()
+            itens = list(pedido.itens.all())
+            itens_separados_count = sum(1 for i in itens if i.separado)
+            total_itens_count = len(itens)
+            progresso_percentual = int((itens_separados_count / total_itens_count) * 100) if total_itens_count > 0 else 0
+
+            async_to_sync(channel_layer.group_send)(
+                'dashboard',
+                {
+                    'type': 'item_separado',
+                    'pedido_id': pedido.id,
+                    'progresso': progresso_percentual,
+                    'itens_separados': itens_separados_count,
+                    'total_itens': total_itens_count,
+                    'item_id': item_id
+                }
+            )
+            logger.info(
+                f"Evento WebSocket enviado: item_marcado_compra "
+                f"(pedido_id={pedido.id}, item_id={item_id})"
+            )
+        except Exception as e:
+            logger.warning(f"Erro ao enviar evento WebSocket marcar_compra: {e}")
 
         # Renderizar partial atualizado do item
         return render(
@@ -1198,8 +1279,38 @@ class SubstituirItemView(View):
             'separado_por'
         ).get(id=item_id)
 
+        # Fase 35: Broadcast evento WebSocket para atualização em tempo real
+        try:
+            channel_layer = get_channel_layer()
+
+            # Calcular progresso atualizado (item substituído conta como separado)
+            pedido = item.pedido
+            pedido.refresh_from_db()
+            itens = list(pedido.itens.all())
+            itens_separados_count = sum(1 for i in itens if i.separado)
+            total_itens_count = len(itens)
+            progresso_percentual = int((itens_separados_count / total_itens_count) * 100) if total_itens_count > 0 else 0
+
+            async_to_sync(channel_layer.group_send)(
+                'dashboard',
+                {
+                    'type': 'item_separado',
+                    'pedido_id': pedido.id,
+                    'progresso': progresso_percentual,
+                    'itens_separados': itens_separados_count,
+                    'total_itens': total_itens_count,
+                    'item_id': item_id
+                }
+            )
+            logger.info(
+                f"Evento WebSocket enviado: item_substituido "
+                f"(pedido_id={pedido.id}, item_id={item_id}, progresso={progresso_percentual}%)"
+            )
+        except Exception as e:
+            logger.warning(f"Erro ao enviar evento WebSocket substituir_item: {e}")
+
         # Renderizar partial atualizado do item
-        return render(
+        response = render(
             request,
             'partials/_item_pedido.html',
             {
@@ -1207,6 +1318,13 @@ class SubstituirItemView(View):
                 'pedido': item.pedido
             }
         )
+
+        # Fase 37: Adicionar header customizado para indicar mudança de estado (animações)
+        # Item substituído deve se comportar como item separado (vai para seção "Itens Separados")
+        response['HX-Trigger'] = 'itemSeparado'
+        response['X-Item-State-Changed'] = 'separado'
+
+        return response
 
 
 class FinalizarPedidoView(View):
@@ -1541,11 +1659,13 @@ class PedidoCardPartialView(View):
         tempo_decorrido = timezone.now() - pedido.data_inicio
         tempo_decorrido_minutos = int(tempo_decorrido.total_seconds() / 60)
 
-        # Contar itens separados
+        # Contar itens separados ou substituídos
         itens = pedido.itens.all()
         total_itens = itens.count()
-        itens_separados = itens.filter(separado=True).count()
-        progresso_percentual = int((itens_separados / total_itens * 100)) if total_itens > 0 else 0
+        # Contar separados OU substituídos (Q object para OR lógico)
+        from django.db.models import Q
+        itens_concluidos = itens.filter(Q(separado=True) | Q(substituido=True)).count()
+        progresso_percentual = int((itens_concluidos / total_itens * 100)) if total_itens > 0 else 0
 
         # Buscar separadores ativos (usuários do tipo SEPARADOR que têm sessões ativas)
         # Por simplicidade, retornar lista vazia (feature futura)
@@ -1556,7 +1676,7 @@ class PedidoCardPartialView(View):
             'pedido': pedido,
             'tempo_decorrido_minutos': tempo_decorrido_minutos,
             'progresso_percentual': progresso_percentual,
-            'itens_separados': itens_separados,
+            'itens_separados': itens_concluidos,  # Itens separados + substituídos
             'total_itens': total_itens,
             'separadores': separadores
         }
@@ -2190,3 +2310,74 @@ class CriarUsuarioView(View):
                 messages.error(request, f'Erro ao criar usuário: {str(e)}')
 
         return render(request, self.template_name, {'form': form})
+
+
+# ==========================================================
+# FASE 35: ATUALIZAÇÃO EM TEMPO REAL DO ESTADO DE ITENS
+# ==========================================================
+
+@method_decorator(login_required, name='dispatch')
+class ItemPedidoPartialView(View):
+    """
+    View para retornar HTML parcial de um item específico (Fase 35).
+
+    Esta view é usada pelo WebSocket para atualizar o estado visual
+    dos itens em tempo real para múltiplos usuários simultâneos.
+
+    Endpoint: GET /pedidos/<pedido_id>/itens/<item_id>/html/
+
+    Funcionalidades:
+    - Retorna apenas o partial _item_pedido.html (sem layout base)
+    - Reflete estado atual do item (separado/não separado/em compra)
+    - Permite sincronização visual entre múltiplos usuários
+
+    Methods:
+        get: Retorna HTML parcial do item atualizado
+    """
+
+    def get(self, request, pedido_id, item_id):
+        """
+        Retorna HTML parcial de um item específico.
+
+        Args:
+            request: HttpRequest
+            pedido_id: ID do pedido
+            item_id: ID do item
+
+        Returns:
+            HttpResponse: HTML parcial do item (sem layout base)
+            404: Se pedido ou item não existirem, ou se item não pertencer ao pedido
+
+        Uso típico (via WebSocket):
+        1. Usuário A marca item como separado
+        2. Backend envia evento WebSocket com item_id
+        3. Usuário B recebe evento e busca HTML atualizado via esta view
+        4. Usuário B vê o item atualizado em tempo real
+        """
+        from django.shortcuts import get_object_or_404
+        from core.models import ItemPedido as ItemPedidoModel, Pedido as PedidoModel
+
+        # Buscar pedido e validar existência
+        pedido = get_object_or_404(PedidoModel, id=pedido_id)
+
+        # Buscar item e validar que pertence ao pedido
+        item = get_object_or_404(
+            ItemPedidoModel.objects.select_related('produto', 'separado_por'),
+            id=item_id,
+            pedido=pedido
+        )
+
+        logger.debug(
+            f"HTML parcial solicitado: pedido_id={pedido_id}, item_id={item_id}, "
+            f"separado={item.separado}, usuario={request.user.nome}"
+        )
+
+        # Renderizar apenas o partial (sem base.html)
+        return render(
+            request,
+            'partials/_item_pedido.html',
+            {
+                'item': item,
+                'pedido': pedido
+            }
+        )

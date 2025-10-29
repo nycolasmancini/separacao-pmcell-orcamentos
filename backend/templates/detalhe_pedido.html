@@ -1,6 +1,15 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Pedido #{{ pedido.numero_orcamento }} - Separação PMCELL{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/animations.css' %}">
+{% endblock %}
+
+{% block extra_head %}
+<script src="{% static 'js/item-animations.js' %}"></script>
+{% endblock %}
 
 {% block content %}
 <div class="min-h-screen bg-gray-50">
@@ -70,7 +79,7 @@
                     <p class="text-sm font-medium text-gray-500 mb-1">Progresso</p>
                     <div class="flex items-center">
                         <span id="progresso-percentual" class="text-2xl font-bold text-green-600">{{ progresso_percentual }}%</span>
-                        <span id="contador-itens" class="text-sm text-gray-500 ml-2">({{ itens_separados|length }}/{{ itens_separados|length|add:itens_nao_separados|length }})</span>
+                        <span id="contador-itens" class="text-sm text-gray-500 ml-2">({{ itens_separados_count }}/{{ total_itens }})</span>
                     </div>
                 </div>
             </div>
@@ -82,9 +91,21 @@
                 </div>
             </div>
 
-            <!-- Botão Finalizar Pedido (aparece apenas quando progresso = 100%) -->
-            <div id="container-botao-finalizar" class="mt-6 flex justify-end" style="{% if progresso_percentual != 100 %}display: none;{% endif %}">
-            {% if progresso_percentual == 100 %}
+            {#
+                Botão Finalizar Pedido (Fase 36 - Real-time Fix)
+
+                IMPORTANTE: Botão deve ser renderizado SEMPRE no HTML inicial,
+                independente do progresso. O JavaScript controla visibilidade via
+                WebSocket quando progresso atinge 100%.
+
+                NÃO usar if progresso_percentual == 100 ao redor do button,
+                pois impede que WebSocket mostre botão em tempo real.
+            #}
+            <div id="container-botao-finalizar"
+                 class="mt-6 flex justify-end"
+                 style="{% if progresso_percentual != 100 %}display: none;{% endif %}"
+                 data-progresso-inicial="{{ progresso_percentual }}">
+                {# Botão renderizado SEMPRE (independente do progresso) #}
                 <button
                     type="button"
                     hx-get="{% url 'finalizar_pedido' pedido_id=pedido.id %}"
@@ -97,58 +118,33 @@
                     </svg>
                     Finalizar Pedido
                 </button>
-            {% endif %}
             </div>
         </div>
 
-        <!-- Seção: Itens Não Separados -->
-        {% if itens_nao_separados %}
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-xl font-bold text-gray-900 flex items-center">
-                    <svg class="h-6 w-6 mr-2 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Itens Não Separados
-                </h2>
-                <span id="badge-nao-separados" class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
-                    {{ itens_nao_separados|length }} itens
-                </span>
-            </div>
-
-            <div class="space-y-3">
-                {% for item in itens_nao_separados %}
-                    {% include 'partials/_item_pedido.html' with item=item pedido=pedido %}
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Seção: Itens Separados -->
-        {% if itens_separados %}
+        <!-- Seção: Lista Corrida de Itens (Fase 39c) -->
+        {% if itens %}
         <div class="bg-white rounded-lg shadow-md p-6">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-xl font-bold text-gray-900 flex items-center">
-                    <svg class="h-6 w-6 mr-2 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <svg class="h-6 w-6 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
-                    Itens Separados
+                    Itens do Pedido
                 </h2>
-                <span id="badge-separados" class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                    {{ itens_separados|length }} itens
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                    {{ total_itens }} itens
                 </span>
             </div>
 
-            <div class="space-y-3">
-                {% for item in itens_separados %}
+            {# Lista corrida única - ordenada por estado #}
+            <div id="lista-itens" class="space-y-3">
+                {% for item in itens %}
                     {% include 'partials/_item_pedido.html' with item=item pedido=pedido %}
                 {% endfor %}
             </div>
         </div>
-        {% endif %}
-
-        <!-- Estado Vazio -->
-        {% if not itens_nao_separados and not itens_separados %}
+        {% else %}
+        {# Estado Vazio #}
         <div class="bg-white rounded-lg shadow-md p-12 text-center">
             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
@@ -161,7 +157,10 @@
 </div>
 
 {# WebSocket para atualizações em tempo real #}
-<script>
+{# Cache Buster: Força reload do JavaScript inline em desenvolvimento #}
+<script data-version="v1.1-{{ pedido.id }}-{% now 'U' %}">
+// Script Version: v1.1 (Fase 35 - fetch() compatible) - Timestamp: {% now 'U' %}
+// Cache Buster: Força reload automático quando template muda
 (function() {
     'use strict';
 
@@ -174,6 +173,7 @@
     const maxReconnectAttempts = 10;
     const reconnectDelay = 3000; // 3 segundos
 
+    console.log('[DetalhesPedido] 🚀 Script v1.1 carregado - fetch() compatible');
     console.log('[DetalhesPedido] Inicializando WebSocket para pedido', pedidoId);
 
     // Conectar ao WebSocket
@@ -244,14 +244,74 @@
         }
     }
 
-    // Handler: Item Separado (atualizar progresso em tempo real)
+    // Handler: Item Separado (atualizar progresso E HTML do item em tempo real - Fase 35)
     function handleItemSeparado(data) {
-        const { progresso, itens_separados, total_itens } = data;
+        const { progresso, itens_separados, total_itens, item_id } = data;
 
         console.log('[WebSocket] Item separado:', {
             progresso: progresso + '%',
-            itens: `${itens_separados}/${total_itens}`
+            itens: `${itens_separados}/${total_itens}`,
+            item_id: item_id
         });
+
+        // FASE 37: Buscar HTML atualizado do item via fetch com animações fluidas
+        if (item_id && window.ItemAnimations) {
+            const url = `/pedidos/${pedidoId}/itens/${item_id}/html/`;
+            console.log('[WebSocket] Buscando HTML atualizado do item:', url);
+
+            // FASE 38: Verificar se ação local está em progresso (evitar duplicação)
+            if (window.ItemAnimations && window.ItemAnimations.isLocalActionInProgress(item_id)) {
+                console.log(`[WebSocket] ⏭️  Ignorando evento para item ${item_id} - ação local em progresso`);
+                return; // NÃO processar WebSocket
+            }
+
+            // FASE 38B: Remover de TODOS os containers (não apenas primeira ocorrência)
+            window.ItemAnimations.removerItemCompletamente(item_id)
+                .then(() => {
+
+                        // 3. Buscar HTML atualizado
+                        return fetch(url, {
+                            method: 'GET',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRFToken': document.querySelector('[name=csrf-token]')?.content || ''
+                            },
+                            credentials: 'same-origin'
+                        });
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return response.text();
+                    })
+                    .then(html => {
+                        // FASE 39c: Lista corrida única - sempre inserir em #lista-itens
+                        const containerDestino = document.getElementById('lista-itens');
+
+                        if (containerDestino) {
+                            return window.ItemAnimations.insertWithAnimation(containerDestino, html);
+                        }
+                        return null;
+                    })
+                    .then(newItem => {
+                        if (newItem) {
+                            // Reprocessar HTMX para ativar atributos hx-* do novo elemento
+                            htmx.process(newItem);
+                            console.log(`[WebSocket] Item ${item_id} atualizado com sucesso (com animações)`);
+
+                            // FASE 38B: Validar unicidade após inserção via WebSocket
+                            try {
+                                window.ItemAnimations.validarUnicidadeItem(item_id);
+                            } catch (error) {
+                                console.error(`[WebSocket] ${error.message}`);
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error(`[WebSocket] Erro ao atualizar item ${item_id}:`, error);
+                    });
+        }
 
         // 1. Atualizar progresso percentual
         const progressoEl = document.getElementById('progresso-percentual');
@@ -276,33 +336,38 @@
             barraProgressoEl.style.width = progresso + '%';
         }
 
-        // 4. Atualizar badge de itens não separados
-        const badgeNaoSeparadosEl = document.getElementById('badge-nao-separados');
-        if (badgeNaoSeparadosEl) {
-            const naoSeparados = total_itens - itens_separados;
-            badgeNaoSeparadosEl.textContent = `${naoSeparados} itens`;
-        }
-
-        // 5. Atualizar badge de itens separados
-        const badgeSeparadosEl = document.getElementById('badge-separados');
-        if (badgeSeparadosEl) {
-            badgeSeparadosEl.textContent = `${itens_separados} itens`;
-        }
-
-        // 6. Mostrar/ocultar botão finalizar quando atinge 100%
+        // 4. Mostrar/ocultar botão finalizar quando atinge 100% (Fase 36 - Real-time Fix)
         const containerBotaoFinalizar = document.getElementById('container-botao-finalizar');
         if (containerBotaoFinalizar) {
+            // Validar que botão existe no DOM (Fase 36 fix)
+            const botao = containerBotaoFinalizar.querySelector('button');
+
+            if (!botao) {
+                console.error('[WebSocket] ❌ ERRO CRÍTICO: Botão finalizar não encontrado no DOM!');
+                console.error('[WebSocket] Isso indica que {# if progresso == 100 % #} ainda está ao redor do <button>');
+                return;
+            }
+
             if (progresso === 100) {
+                console.log('[WebSocket] ✅ Exibindo botão finalizar (100% concluído)');
                 containerBotaoFinalizar.style.display = 'flex';
+
                 // Adicionar animação de fade-in
                 containerBotaoFinalizar.style.opacity = '0';
                 setTimeout(() => {
                     containerBotaoFinalizar.style.transition = 'opacity 0.5s ease-in';
                     containerBotaoFinalizar.style.opacity = '1';
                 }, 10);
+
+                // Reprocessar HTMX para garantir que botão seja clickable
+                htmx.process(botao);
+                console.log('[WebSocket] Botão finalizar reprocessado pelo HTMX');
             } else {
+                console.log(`[WebSocket] Botão finalizar oculto (progresso: ${progresso}%)`);
                 containerBotaoFinalizar.style.display = 'none';
             }
+        } else {
+            console.error('[WebSocket] ❌ ERRO: Container #container-botao-finalizar não encontrado!');
         }
 
         console.log('[WebSocket] UI atualizada com sucesso');

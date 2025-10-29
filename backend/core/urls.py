@@ -32,7 +32,8 @@ from core.presentation.web.views import (
     HistoricoView,
     MetricasView,
     AdminPanelView,
-    CriarUsuarioView
+    CriarUsuarioView,
+    ItemPedidoPartialView  # Fase 35
 )
 
 urlpatterns = [
@@ -50,6 +51,7 @@ urlpatterns = [
     path('pedidos/novo/', UploadOrcamentoView.as_view(), name='upload_orcamento'),
     path('pedidos/<int:pedido_id>/', DetalhePedidoView.as_view(), name='detalhe_pedido'),
     path('pedidos/<int:pedido_id>/card/', PedidoCardPartialView.as_view(), name='pedido_card_partial'),  # Fase 30
+    path('pedidos/<int:pedido_id>/itens/<int:item_id>/html/', ItemPedidoPartialView.as_view(), name='item_pedido_partial'),  # Fase 35
     path('pedidos/<int:pedido_id>/itens/<int:item_id>/separar/', SepararItemView.as_view(), name='separar_item'),
     path('pedidos/<int:pedido_id>/itens/<int:item_id>/marcar-compra/', MarcarParaCompraView.as_view(), name='marcar_compra'),
     path('pedidos/<int:pedido_id>/itens/<int:item_id>/substituir/', SubstituirItemView.as_view(), name='substituir_item'),

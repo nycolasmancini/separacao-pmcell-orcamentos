@@ -44,11 +44,12 @@ INSTALLED_APPS = [
 ]
 
 # Fase 34 & 35: Detectar ambiente de testes
-# Verifica se pytest está rodando ou se variável de ambiente foi definida
+# Verifica se pytest está rodando, manage.py test, ou variável de ambiente
 TESTING = (
     os.environ.get('DISABLE_DEBUG_TOOLBAR') == '1' or
     'pytest' in sys.modules or
-    'py.test' in sys.modules
+    'py.test' in sys.modules or
+    'test' in sys.argv  # Django manage.py test
 )
 
 # Fase 34: Debug toolbar (apenas em desenvolvimento, não em testes ou produção)

@@ -208,10 +208,13 @@
    PROGRESS BAR
    ============================================ */
 
-/* Progress bar fill animation */
+/* Progress bar fill animation (usando scaleX para melhor performance) */
 @keyframes progressFill {
     from {
-        width: 0%;
+        transform: scaleX(0);
+    }
+    to {
+        transform: scaleX(1);
     }
 }
 
@@ -377,4 +380,66 @@
     );
     background-size: 200px 100%;
     animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+/* ============================================
+   ANIMAÇÕES DE ITENS (Fase 37)
+   Item Separation: Fade out → Move → Fade in
+   ============================================ */
+
+/* Variáveis CSS para controle centralizado de timing */
+:root {
+    --animation-speed-fast: 250ms;
+    --animation-ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Fade Out: Item desaparece quando separado/substituído */
+@keyframes itemFadeOut {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+}
+
+.item-fade-out {
+    animation: itemFadeOut var(--animation-speed-fast) var(--animation-ease) forwards;
+}
+
+/* Slide In: Item aparece na nova seção (Itens Separados) */
+@keyframes itemSlideIn {
+    0% {
+        opacity: 0;
+        transform: translateY(-10px);
+        max-height: 0;
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+        max-height: 500px;
+    }
+}
+
+.item-slide-in {
+    animation: itemSlideIn var(--animation-speed-fast) var(--animation-ease) forwards;
+}
+
+/* Container: Transição fluida para itens restantes */
+.item-container {
+    transition: all var(--animation-speed-fast) var(--animation-ease);
+    will-change: transform, opacity;
+    overflow: visible; /* Garante que dropdown não seja cortado */
+    position: relative; /* Cria contexto de posicionamento para dropdown */
+}
+
+/* Estados intermediários para controle JavaScript */
+.item-removing {
+    pointer-events: none;
+}
+
+.item-appearing {
+    overflow: hidden;
 }
