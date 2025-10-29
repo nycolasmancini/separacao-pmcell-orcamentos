@@ -91,7 +91,7 @@
                 </div>
             </div>
 
-            {#
+            {% comment %}
                 Botão Finalizar Pedido (Fase 36 - Real-time Fix)
 
                 IMPORTANTE: Botão deve ser renderizado SEMPRE no HTML inicial,
@@ -100,12 +100,12 @@
 
                 NÃO usar if progresso_percentual == 100 ao redor do button,
                 pois impede que WebSocket mostre botão em tempo real.
-            #}
+            {% endcomment %}
             <div id="container-botao-finalizar"
                  class="mt-6 flex justify-end"
                  style="{% if progresso_percentual != 100 %}display: none;{% endif %}"
                  data-progresso-inicial="{{ progresso_percentual }}">
-                {# Botão renderizado SEMPRE (independente do progresso) #}
+                {% comment %}Botão renderizado SEMPRE (independente do progresso){% endcomment %}
                 <button
                     type="button"
                     hx-get="{% url 'finalizar_pedido' pedido_id=pedido.id %}"
@@ -420,6 +420,24 @@
     window.addEventListener('beforeunload', function() {
         if (socket && socket.readyState === WebSocket.OPEN) {
             socket.close();
+        }
+    });
+
+    // FIX: Reinicializar Alpine.js após HTMX swaps (para dropdowns funcionarem)
+    document.body.addEventListener('htmx:afterSwap', function(event) {
+        // Verificar se Alpine está disponível
+        if (window.Alpine) {
+            console.log('[HTMX] Reinicializando Alpine.js após swap');
+            // Reinicializar Alpine.js no elemento atualizado
+            window.Alpine.initTree(event.detail.target);
+        }
+    });
+
+    // FIX: Reinicializar Alpine.js após HTMX settle (para casos onde swap não é suficiente)
+    document.body.addEventListener('htmx:afterSettle', function(event) {
+        if (window.Alpine) {
+            console.log('[HTMX] Reinicializando Alpine.js após settle');
+            window.Alpine.initTree(event.detail.target);
         }
     });
 })();

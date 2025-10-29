@@ -471,6 +471,21 @@
     user-select: none;
 }
 
+/* FIX: Exceção para botão de três pontos - mantém clicável durante animações */
+.item-reordering .relative[class*="z-"],
+.item-reordering .relative button[aria-label="Menu de opções"] {
+    pointer-events: auto !important;
+    z-index: 10000 !important;
+}
+
+/* FIX: Dropdown menu sempre clicável e acima de tudo (inclusive hover) */
+.item-reordering [class*="dropdown"],
+.item-reordering div[style*="z-index"],
+div[style*="z-index: 9999"] {
+    pointer-events: auto !important;
+    z-index: 10000 !important;
+}
+
 /* Transição suave de posição para itens adjacentes */
 .item-container.reordering-neighbor {
     transition: transform var(--animation-speed-fast) var(--animation-ease);

@@ -165,7 +165,8 @@
 <!-- Item NÃO SEPARADO (Com Menu de Opções) - Fase 23 -->
 <div class="item-container border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-all duration-300"
      id="item-{{ item.id }}"
-     x-data="{ menuOpen: false }">
+     x-data="{ menuOpen: false }"
+     :class="{ 'relative z-10': !menuOpen, 'relative z-50': menuOpen }">
     <div class="flex items-start justify-between">
         <div class="flex-1">
             <div class="flex items-center space-x-3">
@@ -212,40 +213,44 @@
         </div>
 
         <!-- Menu de Opções (3 pontinhos) + Badge - Fase 23 -->
-        <div class="ml-4 flex items-center space-x-2">
+        <div class="ml-4 flex items-center space-x-2 relative">
             <!-- Badge Aguardando -->
             <span class="inline-flex items-center px-2.5 py-1.5 rounded-md text-xs font-medium bg-red-50 text-red-700 border border-red-200">
                 Aguardando
             </span>
 
-            <!-- Botão Menu (3 pontinhos) -->
-            <div class="relative">
+            <!-- Botão Menu (3 pontinhos) - FIX: z-index e estrutura melhorada -->
+            <div class="relative z-10">
                 <button
-                    @click="menuOpen = !menuOpen"
-                    @click.outside="menuOpen = false"
-                    class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                    @click.stop="menuOpen = !menuOpen"
+                    type="button"
+                    class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors relative z-20"
                     title="Mais opções"
+                    aria-label="Menu de opções"
                 >
-                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <svg class="w-5 h-5 pointer-events-none" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
                     </svg>
                 </button>
 
-                <!-- Dropdown Menu -->
+                <!-- Dropdown Menu - FIX: z-index aumentado e click.outside movido -->
                 <div
                     x-show="menuOpen"
+                    @click.outside="menuOpen = false"
+                    x-cloak
                     x-transition:enter="transition ease-out duration-100"
                     x-transition:enter-start="transform opacity-0 scale-95"
                     x-transition:enter-end="transform opacity-100 scale-100"
                     x-transition:leave="transition ease-in duration-75"
                     x-transition:leave-start="transform opacity-100 scale-100"
                     x-transition:leave-end="transform opacity-0 scale-95"
-                    class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50"
-                    style="display: none;"
+                    class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200"
+                    style="z-index: 9999;"
                 >
                     <div class="py-1">
                         <!-- Opção: Marcar para Compra -->
                         <button
+                            type="button"
                             hx-post="{% url 'marcar_compra' pedido.id item.id %}"
                             hx-trigger="click"
                             hx-target="#item-{{ item.id }}"
@@ -261,6 +266,7 @@
 
                         <!-- Opção: Marcar como Substituído (Fase 24) -->
                         <button
+                            type="button"
                             hx-get="{% url 'substituir_item' pedido.id item.id %}"
                             hx-trigger="click"
                             hx-target="body"

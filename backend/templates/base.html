@@ -41,6 +41,11 @@
         .rotate-180 {
             transform: rotate(180deg);
         }
+
+        /* Alpine.js x-cloak: esconde elementos até Alpine.js inicializar */
+        [x-cloak] {
+            display: none !important;
+        }
     </style>
 
     {% block extra_css %}{% endblock %}
