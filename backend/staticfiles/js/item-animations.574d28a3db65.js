@@ -626,6 +626,88 @@
     }
 
     /**
+     * FASE 39E: Reordena item com animação quando estado muda
+     * @param {HTMLElement} itemElement - Elemento do item a ser reordenado
+     * @param {HTMLElement} container - Container #lista-itens
+     * @returns {Promise<void>}
+     */
+    function reordenarItemComAnimacao(itemElement, container) {
+        return new Promise((resolve) => {
+            if (!itemElement || !container) {
+                console.error('[Animations] reordenarItemComAnimacao: parâmetros inválidos');
+                resolve();
+                return;
+            }
+
+            // 1. Detectar novo estado do item
+            const novoEstado = detectarEstadoItem(itemElement);
+            console.log(`[Animations] Reordenando item para estado: ${novoEstado}`);
+
+            // 2. Obter descrição do produto
+            const descEl = itemElement.querySelector('.font-semibold.text-gray-900') ||
+                           itemElement.querySelector('[class*="font-semibold"]');
+            const descricao = descEl ? descEl.textContent.trim() : '';
+
+            // 3. Calcular posição de destino
+            // Importante: calcular ANTES de remover o item do DOM
+            const posicaoAtual = Array.from(container.children).indexOf(itemElement);
+
+            // Criar lista temporária sem o item atual para calcular posição correta
+            const tempContainer = document.createElement('div');
+            Array.from(container.children).forEach(child => {
+                if (child !== itemElement) {
+                    tempContainer.appendChild(child.cloneNode(true));
+                }
+            });
+
+            const posicaoDestino = calcularPosicaoDestino(novoEstado, descricao, tempContainer);
+
+            console.log(
+                `[Animations] Reordenação: posição ${posicaoAtual} → ${posicaoDestino}`
+            );
+
+            // Se já está na posição correta, não fazer nada
+            if (posicaoAtual === posicaoDestino) {
+                console.log('[Animations] Item já está na posição correta, skip');
+                resolve();
+                return;
+            }
+
+            // 4. Aplicar fade out
+            itemElement.classList.add('item-fade-out', 'item-reordering');
+
+            // 5. Aguardar animação de fade out
+            setTimeout(() => {
+                // 6. Remover item do DOM
+                itemElement.remove();
+
+                // 7. Inserir na nova posição
+                const itensAtuais = Array.from(container.children);
+
+                if (posicaoDestino >= itensAtuais.length) {
+                    // Inserir no final
+                    container.appendChild(itemElement);
+                } else {
+                    // Inserir antes do item na posição destino
+                    container.insertBefore(itemElement, itensAtuais[posicaoDestino]);
+                }
+
+                // 8. Remover classes de animação e aplicar fade in
+                itemElement.classList.remove('item-fade-out', 'item-reordering');
+                itemElement.classList.add('item-fade-in');
+
+                // 9. Aguardar fade in completar
+                setTimeout(() => {
+                    itemElement.classList.remove('item-fade-in');
+                    console.log('[Animations] Reordenação completa');
+                    resolve();
+                }, ANIMATION_DURATION);
+
+            }, ANIMATION_DURATION);
+        });
+    }
+
+    /**
      * Inicializa o sistema de animações
      */
     function init() {
@@ -658,6 +740,8 @@
             // FASE 39D: Expor funções de detecção de estado e cálculo de posição
             detectarEstadoItem,
             calcularPosicaoDestino,
+            // FASE 39E: Expor função de reordenação animada
+            reordenarItemComAnimacao,
             ANIMATION_DURATION
         };
     }
