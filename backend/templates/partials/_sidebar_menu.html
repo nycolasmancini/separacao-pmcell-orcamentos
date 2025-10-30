@@ -2,7 +2,7 @@
 <!-- Fase 40: Menu Hamburguer com Alpine.js -->
 
 <div x-data="{
-    sidebarOpen: false,
+    sidebarOpen: window.innerWidth >= 1024,
     sidebarExpanded: true,
     adminSubmenuOpen: false
 }" x-cloak>
@@ -39,9 +39,14 @@
     <aside
         id="sidebar"
         data-sidebar
-        :class="sidebarExpanded ? 'lg:w-64' : 'lg:w-20'"
-        class="fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out transform bg-white border-r border-gray-200 shadow-xl lg:translate-x-0 lg:shadow-lg"
-        :class="{ '-translate-x-full': !sidebarOpen }"
+        class="fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out transform bg-white border-r border-gray-200 shadow-xl lg:shadow-lg"
+        :class="{
+            '-translate-x-full': !sidebarOpen,
+            'translate-x-0': sidebarOpen,
+            'lg:translate-x-0': true,
+            'lg:w-64': sidebarExpanded,
+            'lg:w-20': !sidebarExpanded
+        }"
     >
         <!-- Header da Sidebar -->
         <div class="flex items-center justify-between px-4 py-6 border-b border-gray-200">
