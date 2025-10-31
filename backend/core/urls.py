@@ -24,8 +24,10 @@ from core.presentation.web.views import (
     DetalhePedidoView,
     SepararItemView,
     MarcarParaCompraView,
+    DesmarcarCompraView,  # Fase 42b
     SubstituirItemView,
     FinalizarPedidoView,
+    ReabrirPedidoView,
     PainelComprasView,
     MarcarPedidoRealizadoView,
     PedidoCardPartialView,
@@ -54,6 +56,8 @@ urlpatterns = [
     path('pedidos/<int:pedido_id>/itens/<int:item_id>/html/', ItemPedidoPartialView.as_view(), name='item_pedido_partial'),  # Fase 35
     path('pedidos/<int:pedido_id>/itens/<int:item_id>/separar/', SepararItemView.as_view(), name='separar_item'),
     path('pedidos/<int:pedido_id>/itens/<int:item_id>/marcar-compra/', MarcarParaCompraView.as_view(), name='marcar_compra'),
+    path('pedidos/<int:pedido_id>/itens/<int:item_id>/desmarcar-compra/', DesmarcarCompraView.as_view(), name='desmarcar_compra'),  # Fase 42b
     path('pedidos/<int:pedido_id>/itens/<int:item_id>/substituir/', SubstituirItemView.as_view(), name='substituir_item'),
     path('pedidos/<int:pedido_id>/finalizar/', FinalizarPedidoView.as_view(), name='finalizar_pedido'),
+    path('pedidos/<int:pedido_id>/reabrir/', ReabrirPedidoView.as_view(), name='reabrir_pedido'),
 ]

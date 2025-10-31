@@ -118,7 +118,8 @@ class DashboardConsumer(AsyncWebsocketConsumer):
             'progresso': event['progresso'],
             'itens_separados': event['itens_separados'],
             'total_itens': event['total_itens'],
-            'item_id': event['item_id']
+            'item_id': event['item_id'],
+            'em_compra': event.get('em_compra', False)  # Fase 43a: Flag para remover do painel de compras
         }))
 
     async def pedido_finalizado(self, event):
@@ -131,4 +132,86 @@ class DashboardConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': 'pedido_finalizado',
             'pedido_id': event['pedido_id'],
+        }))
+
+    async def item_marcado_compra(self, event):
+        """
+        Handler para evento 'item_marcado_compra'.
+        Notifica painel de compras quando novo item é enviado para compra.
+
+        Args:
+            event (dict): Evento recebido do channel layer
+                - item_id: ID do item
+                - pedido_id: ID do pedido
+                - numero_orcamento: Número do orçamento
+                - nome_cliente: Nome do cliente
+                - produto_codigo: Código do produto
+                - produto_descricao: Descrição do produto
+                - quantidade_solicitada: Quantidade
+                - enviado_por: Nome do usuário que enviou
+                - enviado_em: Timestamp formatado
+
+        Envia para o cliente WebSocket dados necessários para
+        renderizar o item no painel de compras em tempo real.
+        """
+        await self.send(text_data=json.dumps({
+            'type': 'item_marcado_compra',
+            'item_id': event.get('item_id'),
+            'pedido_id': event.get('pedido_id'),
+            'numero_orcamento': event.get('numero_orcamento'),
+            'nome_cliente': event.get('nome_cliente'),
+            'produto_codigo': event.get('produto_codigo'),
+            'produto_descricao': event.get('produto_descricao'),
+            'quantidade_solicitada': event.get('quantidade_solicitada'),
+            'enviado_por': event.get('enviado_por'),
+            'enviado_em': event.get('enviado_em')
+        }))
+
+    async def item_desmarcado_compra(self, event):
+        """
+        Handler para evento 'item_desmarcado_compra' (Fase 42c).
+        Notifica painel de compras quando item é desmarcado de compra.
+
+        Args:
+            event (dict): Evento recebido do channel layer
+                - item_id: ID do item
+                - pedido_id: ID do pedido
+                - numero_orcamento: Número do orçamento
+                - produto_codigo: Código do produto
+                - produto_descricao: Descrição do produto
+                - desmarcado_por: Nome do usuário que desmarcou
+
+        Envia para o cliente WebSocket dados necessários para
+        remover o item do painel de compras em tempo real.
+        """
+        await self.send(text_data=json.dumps({
+            'type': 'item_desmarcado_compra',
+            'item_id': event.get('item_id'),
+            'pedido_id': event.get('pedido_id'),
+            'numero_orcamento': event.get('numero_orcamento'),
+            'produto_codigo': event.get('produto_codigo'),
+            'produto_descricao': event.get('produto_descricao'),
+            'desmarcado_por': event.get('desmarcado_por')
+        }))
+
+    async def item_pedido_realizado(self, event):
+        """
+        Handler para evento 'item_pedido_realizado' (Fase 43c).
+        Notifica dashboard quando item em compra é marcado como realizado,
+        permitindo atualizar badge de "Aguardando Compra" para "Já Comprado".
+
+        Args:
+            event (dict): Evento recebido do channel layer
+                - item_id: ID do item
+                - pedido_id: ID do pedido
+                - pedido_realizado: Boolean indicando estado (True/False)
+
+        Envia para o cliente WebSocket dados necessários para
+        atualizar o badge no dashboard em tempo real.
+        """
+        await self.send(text_data=json.dumps({
+            'type': 'item_pedido_realizado',
+            'item_id': event.get('item_id'),
+            'pedido_id': event.get('pedido_id'),
+            'pedido_realizado': event.get('pedido_realizado', False)
         }))

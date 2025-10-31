@@ -18,18 +18,23 @@
     <div class="flex items-start justify-between">
         <div class="flex-1">
             <div class="flex items-center space-x-3">
-                <!-- Checkbox (habilitado para permitir desmarcar) -->
+                <!-- Checkbox (habilitado para permitir desmarcar, desabilitado se pedido finalizado) -->
                 <div class="flex-shrink-0">
                     <input
                         type="checkbox"
                         checked
                         id="checkbox-item-{{ item.id }}"
+                        {% if pedido.status != 'FINALIZADO' %}
                         hx-post="{% url 'separar_item' pedido.id item.id %}"
                         hx-trigger="change"
                         hx-target="#item-{{ item.id }}"
                         hx-swap="outerHTML swap:300ms"
                         hx-indicator="#loading-item-{{ item.id }}"
                         class="w-5 h-5 text-green-600 border-green-300 rounded focus:ring-green-500 cursor-pointer hover:border-green-400 transition-colors"
+                        {% else %}
+                        disabled
+                        class="w-5 h-5 text-green-600 border-green-300 rounded opacity-50 cursor-not-allowed"
+                        {% endif %}
                     />
                     <!-- Indicador de Loading -->
                     <div id="loading-item-{{ item.id }}" class="htmx-indicator">
@@ -93,18 +98,23 @@
     <div class="flex items-start justify-between">
         <div class="flex-1">
             <div class="flex items-center space-x-3">
-                <!-- Checkbox (sempre habilitado em itens aguardando compra) -->
+                <!-- Checkbox (sempre habilitado em itens aguardando compra, desabilitado se pedido finalizado) -->
                 <div class="flex-shrink-0">
                     <!-- Checkbox HABILITADO - Permite separar item mesmo que esteja aguardando compra -->
                     <input
                         type="checkbox"
                         id="checkbox-item-{{ item.id }}"
+                        {% if pedido.status != 'FINALIZADO' %}
                         hx-post="{% url 'separar_item' pedido.id item.id %}"
                         hx-trigger="change"
                         hx-target="#item-{{ item.id }}"
                         hx-swap="outerHTML swap:300ms"
                         hx-indicator="#loading-item-{{ item.id }}"
                         class="w-5 h-5 {% if item.pedido_realizado %}text-blue-600 border-blue-300{% else %}text-orange-600 border-orange-300{% endif %} rounded focus:ring-blue-500 cursor-pointer hover:border-blue-400 transition-colors"
+                        {% else %}
+                        disabled
+                        class="w-5 h-5 {% if item.pedido_realizado %}text-blue-600 border-blue-300{% else %}text-orange-600 border-orange-300{% endif %} rounded opacity-50 cursor-not-allowed"
+                        {% endif %}
                     />
                     <!-- Indicador de Loading -->
                     <div id="loading-item-{{ item.id }}" class="htmx-indicator">
@@ -170,17 +180,22 @@
     <div class="flex items-start justify-between">
         <div class="flex-1">
             <div class="flex items-center space-x-3">
-                <!-- Checkbox HTMX (interativo) -->
+                <!-- Checkbox HTMX (interativo, desabilitado se pedido finalizado) -->
                 <div class="flex-shrink-0">
                     <input
                         type="checkbox"
                         id="checkbox-item-{{ item.id }}"
+                        {% if pedido.status != 'FINALIZADO' %}
                         hx-post="{% url 'separar_item' pedido.id item.id %}"
                         hx-trigger="change"
                         hx-target="#item-{{ item.id }}"
                         hx-swap="outerHTML swap:300ms"
                         hx-indicator="#loading-item-{{ item.id }}"
                         class="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer hover:border-blue-400 transition-colors"
+                        {% else %}
+                        disabled
+                        class="w-5 h-5 text-blue-600 border-gray-300 rounded opacity-50 cursor-not-allowed"
+                        {% endif %}
                     />
                     <!-- Indicador de Loading -->
                     <div id="loading-item-{{ item.id }}" class="htmx-indicator">
@@ -212,10 +227,10 @@
             </div>
         </div>
 
-        <!-- Menu de Opções (3 pontinhos) + Badge - Fase 23 -->
+        <!-- Menu de Opções (3 pontinhos) + Badge - Fase 23 + Fase 42a -->
         <div class="ml-4 flex items-center space-x-2 relative">
-            <!-- Badge Aguardando -->
-            <span class="inline-flex items-center px-2.5 py-1.5 rounded-md text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+            <!-- Badge Aguardando (com ID para HTMX swap - Fase 42a) -->
+            <span id="badge-{{ item.id }}" class="inline-flex items-center px-2.5 py-1.5 rounded-md text-xs font-medium bg-red-50 text-red-700 border border-red-200">
                 Aguardando
             </span>
 
@@ -248,12 +263,12 @@
                     style="z-index: 9999;"
                 >
                     <div class="py-1">
-                        <!-- Opção: Marcar para Compra -->
+                        <!-- Opção: Marcar para Compra (Fase 42a - Badge local swap) -->
                         <button
                             type="button"
                             hx-post="{% url 'marcar_compra' pedido.id item.id %}"
                             hx-trigger="click"
-                            hx-target="#item-{{ item.id }}"
+                            hx-target="#badge-{{ item.id }}"
                             hx-swap="outerHTML swap:300ms"
                             @click="menuOpen = false"
                             class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition-colors flex items-center space-x-2"

@@ -71,7 +71,7 @@
                     <!-- Lista de Itens -->
                     <div class="divide-y divide-gray-200">
                         {% for item in itens %}
-                        <div class="px-6 py-4 hover:bg-gray-50 transition-colors">
+                        <div class="px-6 py-4 hover:bg-gray-50 transition-colors" data-item-id="{{ item.id }}">
                             <div class="flex items-start justify-between">
                                 <!-- Info do Item -->
                                 <div class="flex-1">
@@ -143,4 +143,133 @@
         {% endif %}
     </main>
 </div>
+
+<script>
+// WebSocket Real-Time para Painel de Compras - Fase 41
+(function() {
+    const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+    const wsUrl = protocol + window.location.host + '/ws/dashboard/';
+    let socket = null;
+
+    function connectWebSocket() {
+        console.log('[PainelCompras] Conectando ao WebSocket:', wsUrl);
+
+        socket = new WebSocket(wsUrl);
+
+        socket.onopen = function(e) {
+            console.log('[PainelCompras] WebSocket conectado com sucesso');
+        };
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            console.log('[PainelCompras] Evento recebido:', data);
+
+            if (data.type === 'item_marcado_compra') {
+                handleItemMarcadoCompra(data);
+            } else if (data.type === 'item_desmarcado_compra') {
+                handleItemDesmarcadoCompra(data);
+            } else if (data.type === 'item_separado') {
+                handleItemSeparado(data);
+            }
+        };
+
+        socket.onclose = function(event) {
+            console.log('[PainelCompras] WebSocket fechado. Reconectando em 3s...');
+            setTimeout(connectWebSocket, 3000);
+        };
+
+        socket.onerror = function(error) {
+            console.error('[PainelCompras] Erro no WebSocket:', error);
+        };
+    }
+
+    function handleItemMarcadoCompra(data) {
+        console.log('[PainelCompras] Novo item marcado para compra:', data.item_id);
+
+        // Recarregar página para mostrar novo item (implementação simples e confiável)
+        location.reload();
+    }
+
+    // Fase 42c: Handler para remover item desmarcado do painel
+    function handleItemDesmarcadoCompra(data) {
+        console.log('[PainelCompras] Item desmarcado de compra:', data.item_id);
+
+        // Encontrar elemento do item no DOM
+        const itemElement = document.querySelector(`[data-item-id="${data.item_id}"]`);
+
+        if (!itemElement) {
+            console.log('[PainelCompras] Item não encontrado no DOM (já foi removido?)');
+            return;
+        }
+
+        // Log de remoção para debugging
+        console.log(`[PainelCompras] Item removido do painel: ${data.item_id} (${data.produto_codigo})`);
+
+        // Remover item do DOM com animação suave
+        itemElement.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        itemElement.style.opacity = '0';
+        itemElement.style.transform = 'scale(0.95)';
+
+        // Após animação, remover completamente do DOM
+        setTimeout(() => {
+            itemElement.remove();
+
+            // Verificar se não há mais itens no painel
+            const remainingItems = document.querySelectorAll('[data-item-id]');
+            if (remainingItems.length === 0) {
+                console.log('[PainelCompras] Todos os itens foram removidos. Recarregando para mostrar tela vazia...');
+                location.reload();
+            }
+        }, 300);
+    }
+
+    // Fase 43b: Handler para remover item separado/substituído do painel
+    function handleItemSeparado(data) {
+        console.log('[PainelCompras] Evento item_separado recebido:', data);
+
+        // Verificar se item estava em compra e agora NÃO está mais
+        // Campo em_compra=false indica que item foi separado/substituído
+        // e deve ser removido do painel de compras
+        if (data.em_compra === false) {
+            console.log(`[PainelCompras] Item ${data.item_id} foi separado/substituído e não está mais em compra. Removendo do painel...`);
+
+            // Encontrar elemento do item no DOM
+            const itemElement = document.querySelector(`[data-item-id="${data.item_id}"]`);
+
+            if (!itemElement) {
+                console.log('[PainelCompras] Item não encontrado no DOM (pode não estar neste painel ou já foi removido)');
+                return;
+            }
+
+            // Remover item do DOM com animação suave (fade-out)
+            itemElement.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+            itemElement.style.opacity = '0';
+            itemElement.style.transform = 'scale(0.95)';
+
+            // Após animação, remover completamente do DOM
+            setTimeout(() => {
+                itemElement.remove();
+                console.log(`[PainelCompras] Item ${data.item_id} removido com sucesso do painel de compras`);
+
+                // Verificar se não há mais itens no painel
+                const remainingItems = document.querySelectorAll('[data-item-id]');
+                if (remainingItems.length === 0) {
+                    console.log('[PainelCompras] Todos os itens foram removidos. Recarregando para mostrar tela vazia...');
+                    location.reload();
+                }
+            }, 300);
+        } else {
+            // Item separado mas ainda está em compra (edge case raro)
+            console.log(`[PainelCompras] Item ${data.item_id} foi separado mas ainda está em compra (em_compra=${data.em_compra}). Mantendo no painel.`);
+        }
+    }
+
+    // Conectar ao carregar página
+    connectWebSocket();
+
+    // Expor handlers globalmente para testes E2E
+    window.handleItemDesmarcadoCompra = handleItemDesmarcadoCompra;
+    window.handleItemSeparado = handleItemSeparado;
+})();
+</script>
 {% endblock %}

@@ -265,6 +265,18 @@ class Pedido(models.Model):
     def __str__(self):
         return f"Pedido {self.numero_orcamento} - {self.nome_cliente}"
 
+    def reabrir(self):
+        """
+        Reabre um pedido finalizado, retornando-o para o status EM_SEPARACAO.
+
+        Este método permite que pedidos finalizados sejam reabertos para correções.
+        Remove a data de finalização e altera o status para EM_SEPARACAO.
+        """
+        if self.status == StatusPedidoChoices.FINALIZADO:
+            self.status = StatusPedidoChoices.EM_SEPARACAO
+            self.data_finalizacao = None
+            self.save()
+
     def to_entity(self):
         """
         Converte o modelo Django em entidade de domínio.
@@ -432,15 +444,25 @@ class ItemPedido(models.Model):
 
     def marcar_realizado(self, usuario):
         """
-        Marca o item como pedido realizado pela compradora.
+        Toggle o estado de pedido realizado (marca/desmarca).
 
         Args:
             usuario: Instância de Usuario (compradora)
         """
         from django.utils import timezone
-        self.pedido_realizado = True
-        self.realizado_por = usuario
-        self.realizado_em = timezone.now()
+
+        # Toggle behavior (similar to separar() and marcar_compra())
+        if self.pedido_realizado:
+            # Desmarcar
+            self.pedido_realizado = False
+            self.realizado_por = None
+            self.realizado_em = None
+        else:
+            # Marcar
+            self.pedido_realizado = True
+            self.realizado_por = usuario
+            self.realizado_em = timezone.now()
+
         self.save()
 
     def to_entity(self):

@@ -24,7 +24,7 @@ from asgiref.sync import async_to_sync
 
 from core.presentation.web.forms import LoginForm, UploadOrcamentoForm
 from core.presentation.web.decorators import login_required
-from core.models import Usuario
+from core.models import Usuario, Pedido, StatusPedidoChoices
 from core.application.use_cases.criar_pedido import CriarPedidoUseCase
 from core.application.use_cases.obter_metricas_tempo import ObterMetricasTempoUseCase
 from core.application.dtos.pedido_dtos import CriarPedidoRequestDTO
@@ -885,6 +885,17 @@ class SepararItemView(View):
             item.quantidade_separada = item.quantidade_solicitada
             item.separado_por = request.user
             item.separado_em = timezone.now()
+
+            # Fase 43a: Desmarcar compra quando item é separado
+            # Item separado não deve mais aparecer no painel de compras
+            if item.em_compra:
+                logger.info(
+                    f"Item {item_id} estava em compra - desmarcando automaticamente"
+                )
+                item.em_compra = False
+                item.enviado_para_compra_por = None
+                item.enviado_para_compra_em = None
+
             item.save()
 
             logger.info(
@@ -909,6 +920,7 @@ class SepararItemView(View):
 
         # Fase 30: Broadcast evento WebSocket para dashboard
         # Fase 38: Adicionar flag item_separado para corrigir bug de desmarcação
+        # Fase 43a: Adicionar flag em_compra para sinalizar remoção do painel de compras
         # Payload enriquecido com contadores e item_id para atualizações em tempo real
         try:
             channel_layer = get_channel_layer()
@@ -921,14 +933,15 @@ class SepararItemView(View):
                     'itens_separados': itens_separados_count,
                     'total_itens': total_itens_count,
                     'item_id': item_id,
-                    'item_separado': item.separado  # Fase 38: Flag para determinar container destino
+                    'item_separado': item.separado,  # Fase 38: Flag para determinar container destino
+                    'em_compra': item.em_compra  # Fase 43a: Flag para remover do painel de compras
                 }
             )
             logger.info(
                 f"Evento WebSocket enviado: item_separado "
                 f"(pedido_id={pedido.id}, progresso={progresso_percentual}%, "
                 f"itens={itens_separados_count}/{total_itens_count}, "
-                f"item_id={item_id}, item_separado={item.separado})"
+                f"item_id={item_id}, item_separado={item.separado}, em_compra={item.em_compra})"
             )
         except Exception as e:
             logger.warning(f"Erro ao enviar evento WebSocket item_separado: {e}")
@@ -1015,8 +1028,11 @@ class MarcarParaCompraView(View):
         Returns:
             HttpResponse: Partial HTML do item atualizado ou erro
         """
-        # Validar que é requisição HTMX
-        if not request.headers.get('HX-Request'):
+        # Validar que é requisição HTMX ou AJAX (para testes)
+        is_htmx = request.headers.get('HX-Request')
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+        if not (is_htmx or is_ajax):
             logger.warning(
                 f"Tentativa de marcar item para compra sem HTMX: "
                 f"pedido={pedido_id}, item={item_id}"
@@ -1086,27 +1102,26 @@ class MarcarParaCompraView(View):
             f"por {request.user.nome}"
         )
 
-        # Fase 35: Broadcast evento WebSocket para atualização em tempo real
+        # Fase 41: Broadcast evento WebSocket item_marcado_compra (Fase 41a)
         try:
             channel_layer = get_channel_layer()
 
-            # Calcular progresso (itens marcados para compra não afetam progresso)
             pedido = item.pedido
             pedido.refresh_from_db()
-            itens = list(pedido.itens.all())
-            itens_separados_count = sum(1 for i in itens if i.separado)
-            total_itens_count = len(itens)
-            progresso_percentual = int((itens_separados_count / total_itens_count) * 100) if total_itens_count > 0 else 0
 
             async_to_sync(channel_layer.group_send)(
                 'dashboard',
                 {
-                    'type': 'item_separado',
+                    'type': 'item_marcado_compra',
+                    'item_id': item_id,
                     'pedido_id': pedido.id,
-                    'progresso': progresso_percentual,
-                    'itens_separados': itens_separados_count,
-                    'total_itens': total_itens_count,
-                    'item_id': item_id
+                    'numero_orcamento': pedido.numero_orcamento,
+                    'nome_cliente': pedido.nome_cliente,
+                    'produto_codigo': item.produto.codigo,
+                    'produto_descricao': item.produto.descricao,
+                    'quantidade_solicitada': item.quantidade_solicitada,
+                    'enviado_por': request.user.nome,
+                    'enviado_em': item.enviado_para_compra_em.strftime('%d/%m/%Y %H:%M') if item.enviado_para_compra_em else ''
                 }
             )
             logger.info(
@@ -1116,13 +1131,126 @@ class MarcarParaCompraView(View):
         except Exception as e:
             logger.warning(f"Erro ao enviar evento WebSocket marcar_compra: {e}")
 
-        # Renderizar partial atualizado do item
+        # Renderizar badge específico para atualização local via HTMX (Fase 42a)
         return render(
             request,
-            'partials/_item_pedido.html',
+            'partials/_badge_compra_item.html',
             {
-                'item': item,
-                'pedido': item.pedido
+                'item': item
+            }
+        )
+
+
+class DesmarcarCompraView(View):
+    """
+    View HTMX para desmarcar item de compra (Fase 42b).
+
+    Endpoint: POST /pedidos/<pedido_id>/itens/<item_id>/desmarcar-compra/
+
+    Esta view permite desmarcar um item que havia sido enviado para compra,
+    removendo-o do painel de compras e limpando os campos relacionados.
+
+    Methods:
+        post: Desmarca item de compra e retorna partial HTML atualizado
+    """
+
+    @method_decorator(login_required)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def post(self, request, pedido_id, item_id):
+        """
+        Desmarca item de compra via HTMX.
+
+        Args:
+            request: HttpRequest (deve ter HX-Request header)
+            pedido_id: ID do pedido
+            item_id: ID do item a ser desmarcado
+
+        Returns:
+            HttpResponse: Partial HTML do badge limpo ou erro
+        """
+        # Validar que é requisição HTMX ou AJAX (para testes)
+        is_htmx = request.headers.get('HX-Request')
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+        if not (is_htmx or is_ajax):
+            logger.warning(
+                f"Tentativa de desmarcar item sem HTMX: "
+                f"pedido={pedido_id}, item={item_id}"
+            )
+            from django.http import JsonResponse
+            return JsonResponse(
+                {'erro': 'Requisição inválida'},
+                status=400
+            )
+
+        logger.info(
+            f"Desmarcando item de compra: pedido={pedido_id}, "
+            f"item={item_id}, usuario={request.user.id}"
+        )
+
+        # Buscar item
+        from core.models import ItemPedido as ItemPedidoModel
+
+        try:
+            item = ItemPedidoModel.objects.select_related(
+                'produto',
+                'pedido'
+            ).get(id=item_id, pedido_id=pedido_id)
+
+        except ItemPedidoModel.DoesNotExist:
+            logger.error(f"Item {item_id} não encontrado no pedido {pedido_id}")
+            return render(
+                request,
+                'partials/_erro.html',
+                {'mensagem': 'Item não encontrado'},
+                status=400
+            )
+
+        # Limpar campos de compra
+        item.em_compra = False
+        item.enviado_para_compra_por = None
+        item.enviado_para_compra_em = None
+        item.save()
+
+        logger.info(
+            f"Item {item_id} desmarcado de compra com sucesso "
+            f"por {request.user.nome}"
+        )
+
+        # Fase 42b: Broadcast evento WebSocket item_desmarcado_compra
+        try:
+            channel_layer = get_channel_layer()
+
+            pedido = item.pedido
+            pedido.refresh_from_db()
+
+            async_to_sync(channel_layer.group_send)(
+                'dashboard',
+                {
+                    'type': 'item_desmarcado_compra',
+                    'item_id': item_id,
+                    'pedido_id': pedido.id,
+                    'numero_orcamento': pedido.numero_orcamento,
+                    'produto_codigo': item.produto.codigo,
+                    'produto_descricao': item.produto.descricao,
+                    'desmarcado_por': request.user.nome
+                }
+            )
+            logger.info(
+                f"Evento WebSocket enviado: item_desmarcado_compra "
+                f"(pedido_id={pedido.id}, item_id={item_id})"
+            )
+        except Exception as e:
+            logger.warning(f"Erro ao enviar evento WebSocket desmarcar_compra: {e}")
+
+        # Renderizar badge limpo para atualização local via HTMX (Fase 42b)
+        return render(
+            request,
+            'partials/_badge_compra_item.html',
+            {
+                'item': item
             }
         )
 
@@ -1459,6 +1587,89 @@ class FinalizarPedidoView(View):
         return redirect('dashboard')
 
 
+class ReabrirPedidoView(View):
+    """
+    View para reabrir pedido finalizado, retornando-o ao status EM_SEPARACAO.
+
+    Permite que pedidos finalizados sejam reabertos para correções.
+    Remove da visualização de histórico e retorna ao dashboard ativo.
+
+    Endpoints:
+        POST /pedidos/<pedido_id>/reabrir/ - Reabre pedido finalizado
+    """
+
+    @method_decorator(login_required)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def post(self, request, pedido_id):
+        """
+        Reabre pedido finalizado via POST.
+
+        Args:
+            request: HttpRequest object
+            pedido_id: ID do pedido a ser reaberto
+
+        Returns:
+            HttpResponse com redirect para dashboard ou mensagem de erro
+        """
+        logger.info(f"[ReabrirPedidoView] Iniciando reabertura do pedido {pedido_id}")
+
+        try:
+            # Buscar pedido
+            pedido = Pedido.objects.get(id=pedido_id)
+
+            # Validar se pedido está finalizado
+            if pedido.status != StatusPedidoChoices.FINALIZADO:
+                mensagem = f"Pedido #{pedido.numero_orcamento} não está finalizado e não pode ser reaberto."
+                logger.warning(f"[ReabrirPedidoView] {mensagem} Status atual: {pedido.status}")
+                messages.warning(request, mensagem)
+                return redirect('detalhe_pedido', pedido_id=pedido_id)
+
+            # Reabrir pedido usando método do model
+            pedido.reabrir()
+
+            logger.info(
+                f"[ReabrirPedidoView] Pedido {pedido_id} (#{pedido.numero_orcamento}) "
+                f"reaberto com sucesso. Status: {pedido.status}"
+            )
+
+            # Broadcast evento WebSocket para dashboard
+            try:
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    'dashboard',
+                    {
+                        'type': 'pedido_reaberto',
+                        'pedido_id': pedido_id
+                    }
+                )
+                logger.info(f"[ReabrirPedidoView] Evento WebSocket enviado: pedido_reaberto (pedido_id={pedido_id})")
+            except Exception as e:
+                logger.warning(f"[ReabrirPedidoView] Erro ao enviar evento WebSocket pedido_reaberto: {e}")
+
+            # Mensagem de sucesso
+            messages.success(
+                request,
+                f'Pedido #{pedido.numero_orcamento} reaberto com sucesso! '
+                f'Agora você pode fazer as correções necessárias.'
+            )
+
+            # Redirect para dashboard (pedido agora aparece em "Em Separação")
+            return redirect('dashboard')
+
+        except Pedido.DoesNotExist:
+            mensagem = f"Pedido {pedido_id} não encontrado."
+            logger.error(f"[ReabrirPedidoView] {mensagem}")
+            messages.error(request, mensagem)
+            return redirect('historico')
+        except Exception as e:
+            mensagem = f"Erro ao reabrir pedido: {str(e)}"
+            logger.error(f"[ReabrirPedidoView] {mensagem}", exc_info=True)
+            messages.error(request, mensagem)
+            return redirect('detalhe_pedido', pedido_id=pedido_id)
+
+
 class PainelComprasView(View):
     """
     View do Painel de Compras (Fase 26).
@@ -1592,6 +1803,23 @@ class MarcarPedidoRealizadoView(View):
             f"item_id={item.id} produto={item.produto.descricao} "
             f"pedido={item.pedido.numero_orcamento} "
             f"usuario={request.user.numero_login}"
+        )
+
+        # Fase 43c: Emitir evento WebSocket para sincronizar badge em tempo real
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            'dashboard',
+            {
+                'type': 'item_pedido_realizado',
+                'pedido_id': item.pedido.id,
+                'item_id': item.id,
+                'pedido_realizado': item.pedido_realizado
+            }
+        )
+
+        logger.info(
+            f"[WebSocket] Evento 'item_pedido_realizado' emitido: "
+            f"item_id={item.id} pedido_realizado={item.pedido_realizado}"
         )
 
         # Renderizar badge atualizado (partial HTML para HTMX)

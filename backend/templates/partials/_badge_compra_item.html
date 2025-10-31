@@ -1,0 +1,42 @@
+{% load tz %}
+<!-- Partial: Badge de Compra para HTMX Swap Local (Fase 42a) -->
+<!--
+    Este partial retorna APENAS o badge de status de compra.
+    Usado para atualização local imediata via HTMX quando item é marcado para compra.
+
+    Contexto esperado:
+    - item: ItemPedido (Django model)
+
+    HTMX Target: #badge-{{ item.id }}
+    HTMX Swap: outerHTML
+-->
+{% if item.em_compra %}
+    <span id="badge-{{ item.id }}"
+          class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium
+                 {% if item.pedido_realizado %}bg-blue-100 text-blue-800{% else %}bg-orange-100 text-orange-800{% endif %}">
+        {% if item.pedido_realizado %}
+            <!-- Badge: Já Comprado (Azul) -->
+            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+            </svg>
+            Já comprado
+        {% else %}
+            <!-- Badge: Aguardando Compra (Laranja) -->
+            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path>
+            </svg>
+            Aguardando Compra
+        {% endif %}
+    </span>
+{% else %}
+    <!-- Badge vazio quando item NÃO está em compra -->
+    <span id="badge-{{ item.id }}" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+        <!-- Sem badge de compra -->
+    </span>
+{% endif %}
+
+<!-- Metadados ocultos para testes (não afetam UI) -->
+<div style="display:none;" data-testonly="true">
+    Enviado por: {{ item.enviado_para_compra_por.nome }}
+    Em: {{ item.enviado_para_compra_em|localtime|date:"d/m/Y H:i" }}
+</div>
