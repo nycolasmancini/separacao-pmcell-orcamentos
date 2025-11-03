@@ -21,11 +21,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Collect static files (will be run again in Procfile, but good for build)
+# Create necessary directories
+RUN mkdir -p staticfiles
+
+# Collect static files
 RUN python manage.py collectstatic --noinput || true
 
 # Expose port (Railway will set $PORT env var)
 EXPOSE 8000
 
-# Command will be overridden by Procfile
-CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "separacao_pmcell.asgi:application"]
+# Start command (will use $PORT from Railway)
+CMD daphne -b 0.0.0.0 -p ${PORT:-8000} separacao_pmcell.asgi:application
