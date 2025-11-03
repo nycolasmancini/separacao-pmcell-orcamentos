@@ -1,13 +1,12 @@
 # Nixpacks configuration for Railway deployment
 # https://nixpacks.com/docs/configuration/file
 
+# Use APT instead of Nix for PostgreSQL to avoid postgresql_16.dev error
 [phases.setup]
-nixPkgs = ["python311", "postgresql"]
+nixPkgs = ["...", "python311"]
+aptPkgs = ["libpq-dev", "gcc"]
 
 [phases.install]
-cmds = ["pip install -r requirements.txt"]
-
-[phases.build]
 cmds = ["pip install -r requirements.txt"]
 
 [start]
