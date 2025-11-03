@@ -21,6 +21,7 @@ dj-database-url>=2.1.0  # Parse DATABASE_URL do Railway
 # PDF Processing
 pdfplumber>=0.10.0
 pypdf>=3.0.0
+PyPDF2>=3.0.0  # Para compatibilidade com código legado
 
 # Testing
 pytest>=8.0.0
