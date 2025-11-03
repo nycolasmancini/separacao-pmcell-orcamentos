@@ -1,6 +1,6 @@
 # Dockerfile for Railway deployment
 # Uses Python 3.11 with PostgreSQL client libraries
-# Updated: 2025-11-03 - Force rebuild with PyPDF2 fix
+# Updated: 2025-11-03 14:50 - Force rebuild with PyPDF2 fix + healthcheck disabled
 
 FROM python:3.11-slim
 
