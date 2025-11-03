@@ -24,17 +24,26 @@ Abra no navegador: **https://railway.app/**
 
 ### 4. ⚠️ PASSO CRÍTICO: Configurar Root Directory
 
-**IMPORTANTE:** Antes de continuar, você DEVE configurar o Root Directory, senão o deploy falhará com erro "pip: command not found".
+**🚨 OBRIGATÓRIO - SEM ESTE PASSO O DEPLOY FALHARÁ! 🚨**
 
-1. Clique no serviço criado (o card da sua aplicação)
+O Dockerfile e todas as configurações estão em `/backend`. Você DEVE configurar o Root Directory ANTES que o build termine:
+
+1. **IMEDIATAMENTE** após criar o projeto, clique no serviço criado (o card da sua aplicação)
 2. Vá na aba **"Settings"**
-3. Procure a seção **"Build"** ou **"Source"**
-4. Em **"Root Directory"**, digite: `/backend`
-5. Clique em **"Save"** ou aguarde o auto-save
+3. Role para baixo até encontrar a seção **"Source"** ou **"Build"**
+4. Encontre o campo **"Root Directory"** (pode estar vazio)
+5. Digite EXATAMENTE: `backend` (sem barra no início!)
+6. Pressione Enter ou clique fora do campo para salvar
 
-✅ Isso faz o Railway usar o diretório `/backend` como raiz, onde estão todas as configurações corretas.
+**Verificação:**
+- O campo deve mostrar: `backend`
+- NÃO use: `/backend` (com barra)
+- NÃO use: `backend/` (com barra no final)
+- APENAS: `backend`
 
-🎉 O Railway começará o deploy automaticamente (ou reiniciará após salvar o Root Directory)!
+✅ Isso faz o Railway usar o diretório `backend/` como raiz do build, onde está o Dockerfile.
+
+🎉 O Railway reiniciará o build automaticamente após salvar!
 
 ### 5. Adicionar PostgreSQL
 
