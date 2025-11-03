@@ -190,7 +190,12 @@ CACHES = {
 # Parse do REDIS_URL para extrair host e porta
 redis_url_parsed = urllib.parse.urlparse(REDIS_URL)
 redis_host = redis_url_parsed.hostname or '127.0.0.1'
-redis_port = redis_url_parsed.port or 6379
+
+# Tratamento robusto da porta para evitar erro com placeholders
+try:
+    redis_port = int(redis_url_parsed.port) if redis_url_parsed.port else 6379
+except (ValueError, TypeError):
+    redis_port = 6379  # Fallback para porta padrão
 
 CHANNEL_LAYERS = {
     'default': {
