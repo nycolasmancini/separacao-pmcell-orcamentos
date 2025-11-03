@@ -1,5 +1,6 @@
 # Dockerfile for Railway deployment
 # Uses Python 3.11 with PostgreSQL client libraries
+# Updated: 2025-11-03 - PORT variable fix applied
 
 FROM python:3.11-slim
 
