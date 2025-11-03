@@ -1,1 +1,0 @@
-web: cd backend && daphne -b 0.0.0.0 -p $PORT separacao_pmcell.asgi:application
