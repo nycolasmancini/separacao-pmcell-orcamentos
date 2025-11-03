@@ -6,7 +6,7 @@
     "watchPatterns": ["backend/**"]
   },
   "deploy": {
-    "startCommand": "cd backend && daphne -b 0.0.0.0 -p $PORT separacao_pmcell.asgi:application",
+    "startCommand": "daphne -b 0.0.0.0 -p $PORT separacao_pmcell.asgi:application",
     "healthcheckPath": "/",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
