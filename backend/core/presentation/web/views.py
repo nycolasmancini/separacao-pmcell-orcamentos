@@ -159,7 +159,6 @@ class LoginView(View):
                 logger.info(
                     f"Login bem-sucedido: {usuario.numero_login} - {usuario.nome} ({usuario.tipo})"
                 )
-                messages.success(request, f'Bem-vindo, {usuario.nome}!')
                 return redirect('dashboard')
             else:
                 # PIN incorreto - incrementar tentativas
@@ -267,10 +266,64 @@ class DashboardView(View):
         # Obter métricas de tempo (Fase 20)
         metricas_tempo = self._obter_metricas_tempo()
 
+        # Obter métricas de pedidos (finalizados hoje + em aberto)
+        from django.utils import timezone
+        from datetime import datetime
+        hoje = timezone.now().date()
+        pedidos_finalizados_hoje = Pedido.objects.filter(
+            status=StatusPedidoChoices.FINALIZADO,
+            data_finalizacao__date=hoje
+        ).count()
+        pedidos_em_aberto = Pedido.objects.filter(
+            status=StatusPedidoChoices.EM_SEPARACAO
+        ).count()
+
+        # Selecionar mensagem rotativa para empty state (Fase Mensagens Rotativas)
+        import random
+        # Usar data atual como seed para garantir consistência no mesmo dia
+        random.seed(hoje.toordinal())
+
+        # 7 mensagens criativas para empty state
+        mensagens_empty_state = [
+            {
+                'titulo': 'Tudo certo por aqui!',
+                'subtitulo': 'Nenhum pedido pendente. Aproveite o momento pra recarregar as energias ☕'
+            },
+            {
+                'titulo': 'Tudo tranquilo na área de separação',
+                'subtitulo': 'Nenhum pedido encontrado nos filtros aplicados. Que tal revisar ou aproveitar um café? ☕'
+            },
+            {
+                'titulo': 'Hora do descanso merecido',
+                'subtitulo': 'Nenhum pedido disponível. Use esse tempo pra alongar, respirar e voltar com tudo!'
+            },
+            {
+                'titulo': 'Silêncio no estoque...',
+                'subtitulo': 'Nenhum pedido em separação. Talvez seja o momento ideal para a Eliane pedir post-it rsrs'
+            },
+            {
+                'titulo': 'Zerou a fila!',
+                'subtitulo': 'Nenhum pedido pra separar. Pode comemorar (mas comemora baixo se o Zabin estiver perto)'
+            },
+            {
+                'titulo': 'Fila zerada, energia recarregada',
+                'subtitulo': 'Nenhum pedido em vista. Hora de alongar o mouse e dar aquele gole d\'água 💧'
+            },
+            {
+                'titulo': 'Tudo sob controle',
+                'subtitulo': 'Nenhum pedido para separar agora — sinal de que a equipe está mandando bem! 👏'
+            }
+        ]
+
+        mensagem_do_dia = random.choice(mensagens_empty_state)
+
         # Buscar usuário completo para obter is_admin
         usuario_obj = Usuario.objects.get(id=request.session.get('usuario_id'))
 
         # Preparar contexto
+        import time
+        cache_bust = int(time.time())  # Timestamp para cache-busting de imagens
+
         context = {
             'usuario': {
                 'nome': request.session.get('nome'),
@@ -291,7 +344,11 @@ class DashboardView(View):
             'vendedores': vendedores,
             'search_query': search_query,
             'vendedor_id': vendedor_id,
-            'metricas_tempo': metricas_tempo
+            'metricas_tempo': metricas_tempo,
+            'pedidos_finalizados_hoje': pedidos_finalizados_hoje,
+            'pedidos_em_aberto': pedidos_em_aberto,
+            'mensagem_do_dia': mensagem_do_dia,  # Mensagens rotativas para empty state
+            'cache_bust': cache_bust  # Para forçar reload de imagens estáticas
         }
 
         # Se for requisição HTMX, retornar apenas o partial
@@ -383,8 +440,12 @@ class DashboardView(View):
         """
         itens = pedido.itens.all()
 
+        # Extrair apenas o primeiro nome do vendedor
+        vendedor_primeiro_nome = pedido.vendedor.nome.split()[0] if pedido.vendedor and pedido.vendedor.nome else ""
+
         return {
             'pedido': pedido,
+            'vendedor_primeiro_nome': vendedor_primeiro_nome,
             'tempo_decorrido_minutos': self._calcular_tempo_decorrido(pedido),
             'total_itens': len(itens),
             'itens_separados': self._contar_itens_separados(itens),
@@ -541,7 +602,6 @@ class LogoutView(View):
         request.session.flush()
 
         logger.info(f"Logout realizado com sucesso para usuário {usuario_numero}")
-        messages.success(request, 'Logout realizado com sucesso!')
         return redirect('login')
 
 
@@ -571,7 +631,10 @@ class UploadOrcamentoView(View):
             HttpResponse: Página de upload
         """
         form = self.form_class()
-        return render(request, self.template_name, {'form': form})
+        return render(request, self.template_name, {
+            'form': form,
+            'usuario': request.user
+        })
 
     def post(self, request):
         """
@@ -590,7 +653,7 @@ class UploadOrcamentoView(View):
 
         if not form.is_valid():
             logger.warning(f"Formulário de upload inválido: {form.errors}")
-            return render(request, self.template_name, {'form': form})
+            return render(request, self.template_name, {'form': form, 'usuario': request.user})
 
         try:
             # FASE 4: Usar form.processar_pdf() que integra com OrcamentoParserService
@@ -629,7 +692,7 @@ class UploadOrcamentoView(View):
                 f'Este orçamento já existe no sistema (#{e.numero_orcamento}). '
                 f'Verifique o dashboard ou histórico.'
             )
-            return render(request, self.template_name, {'form': form})
+            return render(request, self.template_name, {'form': form, 'usuario': request.user})
 
         except VendedorNotFoundError as e:
             # Vendedor do PDF não encontrado no sistema
@@ -639,7 +702,7 @@ class UploadOrcamentoView(View):
                 f'Vendedor "{e.nome_vendedor}" não encontrado no sistema. '
                 f'Entre em contato com o administrador.'
             )
-            return render(request, self.template_name, {'form': form})
+            return render(request, self.template_name, {'form': form, 'usuario': request.user})
 
         except IntegrityValidationError as e:
             # Falha na validação matemática do PDF
@@ -649,7 +712,7 @@ class UploadOrcamentoView(View):
                 f'Erro na validação do PDF: {e.message}. '
                 f'Verifique se o PDF está correto ou entre em contato com o suporte.'
             )
-            return render(request, self.template_name, {'form': form})
+            return render(request, self.template_name, {'form': form, 'usuario': request.user})
 
         except ParserError as e:
             # Erro ao fazer parsing do PDF (corrompido, formato inválido, etc.)
@@ -659,7 +722,7 @@ class UploadOrcamentoView(View):
                 f'Erro ao processar PDF: {str(e)}. '
                 f'Verifique se o arquivo está correto e tente novamente.'
             )
-            return render(request, self.template_name, {'form': form})
+            return render(request, self.template_name, {'form': form, 'usuario': request.user})
 
         except Exception as e:
             # Erro inesperado - logar com stacktrace
@@ -669,7 +732,7 @@ class UploadOrcamentoView(View):
                 f'Erro inesperado ao processar PDF: {str(e)}. '
                 f'Entre em contato com o suporte técnico.'
             )
-            return render(request, self.template_name, {'form': form})
+            return render(request, self.template_name, {'form': form, 'usuario': request.user})
 
 
 @method_decorator(login_required, name='dispatch')
@@ -1988,6 +2051,7 @@ class HistoricoView(View):
             'search_query': search_query,
             'vendedor_id': vendedor_id,
             'data_filter': data_filter,
+            'usuario': request.user,
         }
 
         # Se for requisição HTMX, retornar apenas o grid
@@ -2073,16 +2137,22 @@ class HistoricoView(View):
         total_itens = pedido.itens.count()
         itens_separados = pedido.itens.filter(separado=True).count()
 
+        # Pegar apenas primeiro nome do vendedor
+        vendedor_nome = 'N/A'
+        if pedido.vendedor:
+            vendedor_nome = pedido.vendedor.nome.split()[0]
+
         return {
             'id': pedido.id,
             'numero_orcamento': pedido.numero_orcamento,
             'nome_cliente': pedido.nome_cliente,
-            'vendedor': pedido.vendedor.nome if pedido.vendedor else 'N/A',
+            'vendedor': vendedor_nome,
             'data_finalizacao': pedido.data_finalizacao,
             'tempo_total_minutos': tempo_total_minutos,
             'tempo_total_formatado': self._formatar_tempo(tempo_total_minutos),
             'total_itens': total_itens,
             'itens_separados': itens_separados,
+            'observacoes': pedido.observacoes or '',
         }
 
     def _calcular_tempo_total(self, pedido):
@@ -2440,21 +2510,28 @@ class AdminPanelView(View):
 
     def get(self, request):
         """Renderiza a lista de usuários."""
-        # Buscar todos os usuários
-        usuarios = Usuario.objects.all().order_by('numero_login')
+        # Buscar usuários ativos e inativos separadamente
+        usuarios_ativos = Usuario.objects.filter(ativo=True).order_by('numero_login')
+        usuarios_inativos = Usuario.objects.filter(ativo=False).order_by('numero_login')
 
-        # Estatísticas
-        total_usuarios = usuarios.count()
+        # Estatísticas (todos os usuários)
+        total_usuarios = Usuario.objects.count()
+        total_ativos = usuarios_ativos.count()
+        total_inativos = usuarios_inativos.count()
+
         por_tipo = {
-            'VENDEDOR': usuarios.filter(tipo='VENDEDOR').count(),
-            'SEPARADOR': usuarios.filter(tipo='SEPARADOR').count(),
-            'COMPRADORA': usuarios.filter(tipo='COMPRADORA').count(),
-            'ADMINISTRADOR': usuarios.filter(tipo='ADMINISTRADOR').count(),
+            'VENDEDOR': Usuario.objects.filter(tipo='VENDEDOR').count(),
+            'SEPARADOR': Usuario.objects.filter(tipo='SEPARADOR').count(),
+            'COMPRADORA': Usuario.objects.filter(tipo='COMPRADORA').count(),
+            'ADMINISTRADOR': Usuario.objects.filter(tipo='ADMINISTRADOR').count(),
         }
 
         context = {
-            'usuarios': usuarios,
+            'usuarios_ativos': usuarios_ativos,
+            'usuarios_inativos': usuarios_inativos,
             'total_usuarios': total_usuarios,
+            'total_ativos': total_ativos,
+            'total_inativos': total_inativos,
             'estatisticas': por_tipo,
         }
 
@@ -2531,6 +2608,197 @@ class CriarUsuarioView(View):
         return render(request, self.template_name, {'form': form})
 
 
+@method_decorator(login_required, name='dispatch')
+class EditarUsuarioView(View):
+    """
+    View para editar usuário existente.
+
+    Apenas administradores podem acessar.
+    """
+
+    template_name = 'editar_usuario.html'
+    form_class = None  # Será importado dinamicamente
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from core.presentation.web.forms import EditarUsuarioForm
+        self.form_class = EditarUsuarioForm
+
+    def dispatch(self, request, *args, **kwargs):
+        """Verificar se o usuário é administrador."""
+        usuario = Usuario.objects.get(id=request.session.get('usuario_id'))
+
+        if not usuario.is_admin:
+            messages.error(request, 'Acesso negado. Apenas administradores podem acessar esta página.')
+            return redirect('dashboard')
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, user_id):
+        """Renderiza o formulário de edição preenchido."""
+        from django.shortcuts import get_object_or_404
+
+        # Buscar usuário a ser editado
+        usuario_editado = get_object_or_404(Usuario, id=user_id)
+
+        # Preencher formulário com dados atuais
+        form = self.form_class(
+            usuario_id=user_id,
+            initial={
+                'nome': usuario_editado.nome,
+                'tipo': usuario_editado.tipo,
+                'ativo': usuario_editado.ativo,
+            }
+        )
+
+        context = {
+            'form': form,
+            'usuario_editado': usuario_editado,
+        }
+
+        return render(request, self.template_name, context)
+
+    def post(self, request, user_id):
+        """Processa a edição do usuário."""
+        from django.shortcuts import get_object_or_404
+
+        # Buscar usuário a ser editado
+        usuario_editado = get_object_or_404(Usuario, id=user_id)
+
+        # Não permitir editar a si mesmo (evitar lock-out acidental)
+        usuario_logado = Usuario.objects.get(id=request.session.get('usuario_id'))
+        if usuario_editado.id == usuario_logado.id:
+            messages.warning(request, 'Você não pode editar seu próprio usuário através desta tela.')
+            return redirect('admin_panel')
+
+        form = self.form_class(request.POST, usuario_id=user_id)
+
+        if form.is_valid():
+            try:
+                # Extrair dados
+                nome = form.cleaned_data['nome']
+                tipo = form.cleaned_data['tipo']
+                ativo = form.cleaned_data.get('ativo', False)
+                pin = form.cleaned_data.get('pin')
+
+                # Atualizar usuário
+                usuario_editado.nome = nome
+                usuario_editado.tipo = tipo
+                usuario_editado.ativo = ativo
+
+                # Atualizar PIN se fornecido
+                if pin:
+                    usuario_editado.set_password(pin)
+
+                usuario_editado.save()
+
+                logger.info(f"Usuário editado: {usuario_editado.numero_login} - {usuario_editado.nome} ({usuario_editado.tipo})")
+                messages.success(request, f'Usuário {usuario_editado.nome} atualizado com sucesso!')
+
+                return redirect('admin_panel')
+
+            except Exception as e:
+                logger.error(f"Erro ao editar usuário: {str(e)}")
+                messages.error(request, f'Erro ao editar usuário: {str(e)}')
+
+        context = {
+            'form': form,
+            'usuario_editado': usuario_editado,
+        }
+
+        return render(request, self.template_name, context)
+
+
+@method_decorator(login_required, name='dispatch')
+class DeletarUsuarioView(View):
+    """
+    View para deletar usuário (soft delete - marca como inativo).
+
+    Apenas administradores podem acessar.
+    POST only - requer confirmação.
+    """
+
+    def dispatch(self, request, *args, **kwargs):
+        """Verificar se o usuário é administrador."""
+        usuario = Usuario.objects.get(id=request.session.get('usuario_id'))
+
+        if not usuario.is_admin:
+            messages.error(request, 'Acesso negado. Apenas administradores podem acessar esta página.')
+            return redirect('dashboard')
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, user_id):
+        """Marca o usuário como inativo (soft delete)."""
+        from django.shortcuts import get_object_or_404
+
+        # Buscar usuário a ser deletado
+        usuario_deletado = get_object_or_404(Usuario, id=user_id)
+
+        # Não permitir deletar a si mesmo
+        usuario_logado = Usuario.objects.get(id=request.session.get('usuario_id'))
+        if usuario_deletado.id == usuario_logado.id:
+            messages.error(request, 'Você não pode deletar seu próprio usuário!')
+            return redirect('admin_panel')
+
+        try:
+            # Soft delete - marcar como inativo
+            nome_usuario = usuario_deletado.nome
+            usuario_deletado.ativo = False
+            usuario_deletado.save()
+
+            logger.info(f"Usuário deletado (soft delete): {usuario_deletado.numero_login} - {nome_usuario}")
+            messages.success(request, f'Usuário {nome_usuario} foi desativado com sucesso!')
+
+        except Exception as e:
+            logger.error(f"Erro ao deletar usuário: {str(e)}")
+            messages.error(request, f'Erro ao deletar usuário: {str(e)}')
+
+        return redirect('admin_panel')
+
+
+@method_decorator(login_required, name='dispatch')
+class ReativarUsuarioView(View):
+    """
+    View para reativar usuário (ativo=True).
+
+    Apenas administradores podem acessar.
+    POST only - ação direta.
+    """
+
+    def dispatch(self, request, *args, **kwargs):
+        """Verificar se o usuário é administrador."""
+        usuario = Usuario.objects.get(id=request.session.get('usuario_id'))
+
+        if not usuario.is_admin:
+            messages.error(request, 'Acesso negado. Apenas administradores podem acessar esta página.')
+            return redirect('dashboard')
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, user_id):
+        """Reativa o usuário (marca como ativo=True)."""
+        from django.shortcuts import get_object_or_404
+
+        # Buscar usuário a ser reativado
+        usuario_reativado = get_object_or_404(Usuario, id=user_id)
+
+        try:
+            # Reativar - marcar como ativo
+            nome_usuario = usuario_reativado.nome
+            usuario_reativado.ativo = True
+            usuario_reativado.save()
+
+            logger.info(f"Usuário reativado: {usuario_reativado.numero_login} - {nome_usuario}")
+            messages.success(request, f'Usuário {nome_usuario} foi reativado com sucesso!')
+
+        except Exception as e:
+            logger.error(f"Erro ao reativar usuário: {str(e)}")
+            messages.error(request, f'Erro ao reativar usuário: {str(e)}')
+
+        return redirect('admin_panel')
+
+
 # ==========================================================
 # FASE 35: ATUALIZAÇÃO EM TEMPO REAL DO ESTADO DE ITENS
 # ==========================================================
@@ -2600,3 +2868,149 @@ class ItemPedidoPartialView(View):
                 'pedido': pedido
             }
         )
+
+
+# ==================== VIEWS DE TEMA / PERSONALIZAÇÃO ====================
+
+def dynamic_theme_css(request):
+    """
+    View que serve o CSS dinâmico com as cores do tema ativo.
+
+    Esta view renderiza o template theme.css com as variáveis CSS
+    baseadas no tema configurado no banco de dados. O resultado
+    é cacheável e tem content-type text/css.
+
+    Returns:
+        HttpResponse com content-type text/css
+    """
+    from django.http import HttpResponse
+    from django.template import loader
+    from core.models import ThemeConfiguration
+
+    # Obter tema ativo
+    theme = ThemeConfiguration.get_active_theme()
+
+    # Renderizar template CSS com contexto do tema
+    template = loader.get_template('theme.css')
+    context = {
+        'theme': {
+            'primary_color': theme.primary_color,
+            'primary_hover': theme.primary_hover,
+            'vendedor_color': theme.vendedor_color,
+            'separador_color': theme.separador_color,
+            'compradora_color': theme.compradora_color,
+            'admin_color': theme.admin_color,
+            'success_color': theme.success_color,
+            'warning_color': theme.warning_color,
+            'info_color': theme.info_color,
+        }
+    }
+
+    css_content = template.render(context)
+
+    # Retornar como CSS com cache headers
+    response = HttpResponse(css_content, content_type='text/css')
+    response['Cache-Control'] = 'public, max-age=3600'  # Cache por 1 hora
+    return response
+
+
+@method_decorator(login_required, name='dispatch')
+class ConfigurarCoresView(View):
+    """
+    View para configurar cores do tema.
+
+    Permite que administradores personalizem as cores do sistema.
+    Inclui funcionalidade de salvar e resetar para cores padrão.
+    """
+
+    def get(self, request):
+        """Exibe o formulário de configuração de cores."""
+        # Apenas administradores podem acessar
+        if not request.user.is_admin:
+            return HttpResponseForbidden("Apenas administradores podem acessar esta página.")
+
+        # Obter tema ativo
+        from core.models import ThemeConfiguration
+        theme = ThemeConfiguration.get_active_theme()
+
+        # Preencher form com cores atuais
+        from core.presentation.web.forms import ThemeConfigurationForm
+        form = ThemeConfigurationForm(initial={
+            'primary_color': theme.primary_color,
+            'primary_hover': theme.primary_hover,
+            'vendedor_color': theme.vendedor_color,
+            'separador_color': theme.separador_color,
+            'compradora_color': theme.compradora_color,
+            'admin_color': theme.admin_color,
+            'success_color': theme.success_color,
+            'warning_color': theme.warning_color,
+            'info_color': theme.info_color,
+        })
+
+        return render(request, 'configurar_cores.html', {
+            'form': form,
+            'theme': theme
+        })
+
+    def post(self, request):
+        """Salva as cores configuradas ou reseta para padrão."""
+        # Apenas administradores podem modificar
+        if not request.user.is_admin:
+            return HttpResponseForbidden("Apenas administradores podem modificar as cores.")
+
+        from core.models import ThemeConfiguration
+        from core.presentation.web.forms import ThemeConfigurationForm
+
+        # Verificar se é um reset
+        if 'reset' in request.POST:
+            theme = ThemeConfiguration.get_active_theme()
+            theme.reset_to_default()
+
+            # Invalidar cache
+            cache.delete('theme_colors')
+
+            messages.success(request, 'Cores resetadas para o padrão com sucesso!')
+            return redirect('configurar_cores')
+
+        # Processar formulário normal
+        form = ThemeConfigurationForm(request.POST)
+
+        if form.is_valid():
+            theme = ThemeConfiguration.get_active_theme()
+
+            # Atualizar cores
+            theme.primary_color = form.cleaned_data['primary_color']
+            theme.primary_hover = form.cleaned_data['primary_hover']
+            theme.vendedor_color = form.cleaned_data['vendedor_color']
+            theme.separador_color = form.cleaned_data['separador_color']
+            theme.compradora_color = form.cleaned_data['compradora_color']
+            theme.admin_color = form.cleaned_data['admin_color']
+            theme.success_color = form.cleaned_data['success_color']
+            theme.warning_color = form.cleaned_data['warning_color']
+            theme.info_color = form.cleaned_data['info_color']
+
+            theme.save()
+
+            # Invalidar cache para forçar reload das cores
+            cache.delete('theme_colors')
+
+            messages.success(request, 'Cores atualizadas com sucesso!')
+
+            # Broadcast via WebSocket para atualizar todas as páginas abertas
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                'pedidos',
+                {
+                    'type': 'theme_updated',
+                    'message': 'reload_css'
+                }
+            )
+
+            return redirect('configurar_cores')
+
+        # Se form inválido, renderizar com erros
+        theme = ThemeConfiguration.get_active_theme()
+        return render(request, 'configurar_cores.html', {
+            'form': form,
+            'theme': theme
+        })

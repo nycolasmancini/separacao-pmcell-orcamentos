@@ -129,8 +129,8 @@ class UploadOrcamentoForm(forms.Form):
         label='Tipo de Logística',
         required=True,
         choices=[(log.value, log.value.replace('_', ' ').title()) for log in Logistica],
-        widget=forms.Select(attrs={
-            'class': 'w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all',
+        widget=forms.RadioSelect(attrs={
+            'class': 'focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300',
         }),
         error_messages={
             'required': 'O tipo de logística é obrigatório',
@@ -404,5 +404,255 @@ class CriarUsuarioForm(forms.Form):
 
         if pin and pin_confirmacao and pin != pin_confirmacao:
             raise ValidationError('Os PINs não conferem. Digite o mesmo PIN nos dois campos.')
+
+        return cleaned_data
+
+
+class EditarUsuarioForm(forms.Form):
+    """
+    Formulário para editar usuário existente.
+
+    Fields:
+        nome: Nome completo do usuário
+        tipo: Tipo de usuário (VENDEDOR, SEPARADOR, COMPRADORA, ADMINISTRADOR)
+        ativo: Status ativo/inativo
+        pin: PIN de 4 dígitos (opcional - apenas se quiser alterar)
+        pin_confirmacao: Confirmação do PIN (opcional)
+    """
+
+    nome = forms.CharField(
+        label='Nome Completo',
+        max_length=200,
+        widget=forms.TextInput(attrs={
+            'class': 'w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all',
+            'placeholder': 'Nome completo do usuário',
+        }),
+        error_messages={
+            'required': 'O nome é obrigatório',
+            'max_length': 'O nome é muito longo (máximo 200 caracteres)',
+        }
+    )
+
+    tipo = forms.ChoiceField(
+        label='Tipo de Usuário',
+        choices=[
+            ('VENDEDOR', 'Vendedor'),
+            ('SEPARADOR', 'Separador'),
+            ('COMPRADORA', 'Compradora'),
+            ('ADMINISTRADOR', 'Administrador'),
+        ],
+        widget=forms.Select(attrs={
+            'class': 'w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all',
+        }),
+        error_messages={
+            'required': 'O tipo de usuário é obrigatório',
+        }
+    )
+
+    ativo = forms.BooleanField(
+        label='Usuário Ativo',
+        required=False,
+        widget=forms.CheckboxInput(attrs={
+            'class': 'h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded',
+        }),
+    )
+
+    pin = forms.CharField(
+        label='Novo PIN (4 dígitos)',
+        max_length=4,
+        min_length=4,
+        required=False,
+        widget=forms.PasswordInput(attrs={
+            'class': 'w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all',
+            'placeholder': '••••',
+            'maxlength': '4',
+            'pattern': '[0-9]{4}',
+            'inputmode': 'numeric',
+        }),
+        help_text='Deixe em branco para manter o PIN atual',
+        error_messages={
+            'max_length': 'O PIN deve ter exatamente 4 dígitos',
+            'min_length': 'O PIN deve ter exatamente 4 dígitos',
+        }
+    )
+
+    pin_confirmacao = forms.CharField(
+        label='Confirmar Novo PIN',
+        max_length=4,
+        min_length=4,
+        required=False,
+        widget=forms.PasswordInput(attrs={
+            'class': 'w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all',
+            'placeholder': '••••',
+            'maxlength': '4',
+            'pattern': '[0-9]{4}',
+            'inputmode': 'numeric',
+        }),
+        error_messages={
+            'max_length': 'O PIN deve ter exatamente 4 dígitos',
+            'min_length': 'O PIN deve ter exatamente 4 dígitos',
+        }
+    )
+
+    def __init__(self, *args, usuario_id=None, **kwargs):
+        """
+        Inicializa o formulário.
+
+        Args:
+            usuario_id: ID do usuário sendo editado (para validação de unicidade)
+        """
+        self.usuario_id = usuario_id
+        super().__init__(*args, **kwargs)
+
+    def clean_pin(self):
+        """Valida o PIN se fornecido."""
+        pin = self.cleaned_data.get('pin', '')
+
+        # PIN é opcional - se não fornecido, não alterar
+        if not pin:
+            return pin
+
+        if len(pin) != 4:
+            raise ValidationError('O PIN deve ter exatamente 4 dígitos')
+
+        if not pin.isdigit():
+            raise ValidationError('O PIN deve conter apenas números')
+
+        return pin
+
+    def clean(self):
+        """Valida que os PINs conferem se fornecidos."""
+        cleaned_data = super().clean()
+        pin = cleaned_data.get('pin')
+        pin_confirmacao = cleaned_data.get('pin_confirmacao')
+
+        # Se PIN foi fornecido, validar confirmação
+        if pin:
+            if not pin_confirmacao:
+                raise ValidationError('Digite a confirmação do novo PIN')
+
+            if pin != pin_confirmacao:
+                raise ValidationError('Os PINs não conferem. Digite o mesmo PIN nos dois campos.')
+
+        return cleaned_data
+
+
+# ==================== FORM DE CONFIGURAÇÃO DE TEMA ====================
+
+class ThemeConfigurationForm(forms.Form):
+    """
+    Form para personalização das cores do tema.
+
+    Utiliza inputs type="color" do HTML5 para seleção intuitiva de cores.
+    Todas as cores são validadas e armazenadas em formato hexadecimal.
+    """
+
+    # Cores Primárias
+    primary_color = forms.CharField(
+        label='Cor Primária',
+        max_length=7,
+        widget=forms.TextInput(attrs={
+            'type': 'color',
+            'class': 'w-full h-12 rounded cursor-pointer',
+        }),
+        help_text='Cor principal da marca (botões, links ativos)'
+    )
+
+    primary_hover = forms.CharField(
+        label='Cor Primária Hover',
+        max_length=7,
+        widget=forms.TextInput(attrs={
+            'type': 'color',
+            'class': 'w-full h-12 rounded cursor-pointer',
+        }),
+        help_text='Cor de hover para elementos primários'
+    )
+
+    # Cores de Papéis
+    vendedor_color = forms.CharField(
+        label='Cor Vendedor',
+        max_length=7,
+        widget=forms.TextInput(attrs={
+            'type': 'color',
+            'class': 'w-full h-12 rounded cursor-pointer',
+        }),
+        help_text='Cor para badges e elementos do papel Vendedor'
+    )
+
+    separador_color = forms.CharField(
+        label='Cor Separador',
+        max_length=7,
+        widget=forms.TextInput(attrs={
+            'type': 'color',
+            'class': 'w-full h-12 rounded cursor-pointer',
+        }),
+        help_text='Cor para badges e elementos do papel Separador'
+    )
+
+    compradora_color = forms.CharField(
+        label='Cor Compradora',
+        max_length=7,
+        widget=forms.TextInput(attrs={
+            'type': 'color',
+            'class': 'w-full h-12 rounded cursor-pointer',
+        }),
+        help_text='Cor para badges e elementos do papel Compradora'
+    )
+
+    admin_color = forms.CharField(
+        label='Cor Administrador',
+        max_length=7,
+        widget=forms.TextInput(attrs={
+            'type': 'color',
+            'class': 'w-full h-12 rounded cursor-pointer',
+        }),
+        help_text='Cor para badges e elementos do papel Administrador'
+    )
+
+    # Cores de Status
+    success_color = forms.CharField(
+        label='Cor Sucesso',
+        max_length=7,
+        widget=forms.TextInput(attrs={
+            'type': 'color',
+            'class': 'w-full h-12 rounded cursor-pointer',
+        }),
+        help_text='Cor para indicadores de sucesso e estados ativos'
+    )
+
+    warning_color = forms.CharField(
+        label='Cor Aviso',
+        max_length=7,
+        widget=forms.TextInput(attrs={
+            'type': 'color',
+            'class': 'w-full h-12 rounded cursor-pointer',
+        }),
+        help_text='Cor para avisos e estados pendentes'
+    )
+
+    info_color = forms.CharField(
+        label='Cor Informação',
+        max_length=7,
+        widget=forms.TextInput(attrs={
+            'type': 'color',
+            'class': 'w-full h-12 rounded cursor-pointer',
+        }),
+        help_text='Cor para informações e estados em processamento'
+    )
+
+    def clean(self):
+        """
+        Validação customizada para garantir que todas as cores sejam hexadecimais válidas.
+        """
+        import re
+        cleaned_data = super().clean()
+
+        # Padrão de validação para cores hex (#RRGGBB)
+        hex_pattern = re.compile(r'^#[0-9A-Fa-f]{6}$')
+
+        # Validar cada cor
+        for field_name, value in cleaned_data.items():
+            if value and not hex_pattern.match(value):
+                self.add_error(field_name, f'Cor inválida. Use formato hexadecimal (#RRGGBB).')
 
         return cleaned_data

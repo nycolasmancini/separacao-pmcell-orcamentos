@@ -4,7 +4,7 @@
 <div x-data="{
     sidebarOpen: window.innerWidth >= 1024,
     sidebarExpanded: true,
-    adminSubmenuOpen: false
+    adminSubmenuOpen: {% if request.resolver_match.url_name == 'admin_panel' or request.resolver_match.url_name == 'criar_usuario' %}true{% else %}false{% endif %}
 }" x-cloak>
 
     <!-- Botão Hamburguer (Mobile) -->
@@ -152,7 +152,7 @@
             </a>
 
             <!-- Painel de Compras (COMPRADORA e ADMIN) -->
-            {% if usuario.tipo == 'COMPRADORA' or usuario.is_admin %}
+            {% if request.user.tipo == 'COMPRADORA' or request.user.is_admin %}
             <a
                 href="{% url 'painel_compras' %}"
                 class="group flex items-center px-3 py-3 rounded-lg text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-all duration-200 {% if request.resolver_match.url_name == 'painel_compras' %}bg-orange-100 text-orange-600 border-l-4 border-orange-600{% endif %}"
@@ -166,14 +166,14 @@
             {% endif %}
 
             <!-- Divider antes do Admin -->
-            {% if usuario.is_admin %}
+            {% if request.user.is_admin %}
             <div x-show="sidebarExpanded" class="pt-4 pb-2 px-3">
                 <div class="border-t border-gray-200"></div>
             </div>
             {% endif %}
 
             <!-- Admin Panel (ADMIN apenas) - Com Submenu -->
-            {% if usuario.is_admin %}
+            {% if request.user.is_admin %}
             <div>
                 <!-- Item Principal Admin -->
                 <button
@@ -221,6 +221,14 @@
                     >
                         Criar Usuário
                     </a>
+
+                    <!-- Personalizar Cores -->
+                    <a
+                        href="{% url 'configurar_cores' %}"
+                        class="block px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200 {% if request.resolver_match.url_name == 'configurar_cores' %}bg-gray-100 text-gray-900 font-medium{% endif %}"
+                    >
+                        Personalizar Cores
+                    </a>
                 </div>
             </div>
             {% endif %}
@@ -237,7 +245,6 @@
                 </div>
                 <div class="flex-1 min-w-0">
                     <p class="text-xs font-medium text-gray-900 truncate">Sistema Online</p>
-                    <p class="text-xs text-gray-500">Fase 40 - Menu</p>
                 </div>
             </div>
         </div>

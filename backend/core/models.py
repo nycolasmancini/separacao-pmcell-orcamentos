@@ -519,3 +519,168 @@ class ItemPedido(models.Model):
             substituido=item_entity.substituido,
             produto_substituto=item_entity.produto_substituto
         )
+
+
+# ==================== MODELO THEME CONFIGURATION ====================
+
+class ThemeConfiguration(models.Model):
+    """
+    Modelo para armazenar configurações de cores do tema do webapp.
+
+    Permite personalização de cores de acento e paleta de cores
+    através do painel administrativo.
+    """
+    # Cores Primárias
+    primary_color = models.CharField(
+        max_length=7,
+        default='#2563eb',
+        verbose_name='Cor Primária',
+        help_text='Cor principal da marca (ex: botões, links ativos)'
+    )
+    primary_hover = models.CharField(
+        max_length=7,
+        default='#1d4ed8',
+        verbose_name='Cor Primária Hover',
+        help_text='Cor de hover para elementos primários'
+    )
+
+    # Cores de Papéis/Roles
+    vendedor_color = models.CharField(
+        max_length=7,
+        default='#10b981',
+        verbose_name='Cor Vendedor',
+        help_text='Cor para badges e elementos do papel Vendedor'
+    )
+    separador_color = models.CharField(
+        max_length=7,
+        default='#8b5cf6',
+        verbose_name='Cor Separador',
+        help_text='Cor para badges e elementos do papel Separador'
+    )
+    compradora_color = models.CharField(
+        max_length=7,
+        default='#f97316',
+        verbose_name='Cor Compradora',
+        help_text='Cor para badges e elementos do papel Compradora'
+    )
+    admin_color = models.CharField(
+        max_length=7,
+        default='#ef4444',
+        verbose_name='Cor Administrador',
+        help_text='Cor para badges e elementos do papel Administrador'
+    )
+
+    # Cores de Status
+    success_color = models.CharField(
+        max_length=7,
+        default='#10b981',
+        verbose_name='Cor Sucesso',
+        help_text='Cor para indicadores de sucesso e estados ativos'
+    )
+    warning_color = models.CharField(
+        max_length=7,
+        default='#f97316',
+        verbose_name='Cor Aviso',
+        help_text='Cor para avisos e estados pendentes'
+    )
+    info_color = models.CharField(
+        max_length=7,
+        default='#3b82f6',
+        verbose_name='Cor Informação',
+        help_text='Cor para informações e estados em processamento'
+    )
+
+    # Configurações do Sistema
+    active = models.BooleanField(
+        default=True,
+        verbose_name='Ativo',
+        help_text='Define se este tema está ativo no sistema'
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Criado em'
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name='Atualizado em'
+    )
+
+    class Meta:
+        verbose_name = 'Configuração de Tema'
+        verbose_name_plural = 'Configurações de Tema'
+        ordering = ['-active', '-updated_at']
+
+    def __str__(self):
+        status = "Ativo" if self.active else "Inativo"
+        return f"Tema ({status}) - Atualizado em {self.updated_at.strftime('%d/%m/%Y %H:%M')}"
+
+    @classmethod
+    def get_active_theme(cls):
+        """
+        Retorna o tema ativo ou cria um com cores padrão.
+
+        Returns:
+            ThemeConfiguration: Instância do tema ativo
+        """
+        theme = cls.objects.filter(active=True).first()
+        if not theme:
+            # Criar tema padrão se não existir
+            theme = cls.objects.create(active=True)
+        return theme
+
+    @classmethod
+    def get_default_colors(cls):
+        """
+        Retorna um dicionário com as cores padrão do sistema.
+
+        Returns:
+            dict: Dicionário com cores padrão
+        """
+        return {
+            'primary_color': '#2563eb',
+            'primary_hover': '#1d4ed8',
+            'vendedor_color': '#10b981',
+            'separador_color': '#8b5cf6',
+            'compradora_color': '#f97316',
+            'admin_color': '#ef4444',
+            'success_color': '#10b981',
+            'warning_color': '#f97316',
+            'info_color': '#3b82f6',
+        }
+
+    def reset_to_default(self):
+        """
+        Restaura todas as cores para os valores padrão.
+        """
+        defaults = self.get_default_colors()
+        for key, value in defaults.items():
+            setattr(self, key, value)
+        self.save()
+
+    def to_css_variables(self):
+        """
+        Converte as cores em um dicionário de variáveis CSS.
+
+        Returns:
+            dict: Dicionário com variáveis CSS
+        """
+        return {
+            '--color-primary': self.primary_color,
+            '--color-primary-hover': self.primary_hover,
+            '--color-vendedor': self.vendedor_color,
+            '--color-separador': self.separador_color,
+            '--color-compradora': self.compradora_color,
+            '--color-admin': self.admin_color,
+            '--color-success': self.success_color,
+            '--color-warning': self.warning_color,
+            '--color-info': self.info_color,
+        }
+
+    def save(self, *args, **kwargs):
+        """
+        Sobrescreve save para garantir que apenas um tema esteja ativo.
+        """
+        if self.active:
+            # Desativar todos os outros temas
+            ThemeConfiguration.objects.filter(active=True).exclude(pk=self.pk).update(active=False)
+        super().save(*args, **kwargs)

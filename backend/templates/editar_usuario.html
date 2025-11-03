@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Criar Usuário - PMCELL{% endblock %}
+{% block title %}Editar Usuário - PMCELL{% endblock %}
 
 {% block content %}
 <!-- Sidebar Menu -->
@@ -28,6 +28,14 @@
     <!-- Main Content -->
     <main class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div class="bg-white rounded-lg shadow-sm p-8">
+            <!-- Título -->
+            <div class="mb-6">
+                <h1 class="text-2xl font-bold text-gray-900">Editar Usuário</h1>
+                <p class="mt-1 text-sm text-gray-600">
+                    Editando: <strong>{{ usuario_editado.nome }}</strong> (Login: {{ usuario_editado.numero_login }})
+                </p>
+            </div>
+
             <!-- Mensagens de erro -->
             {% if form.non_field_errors %}
             <div class="mb-6 bg-red-50 border-l-4 border-red-400 p-4">
@@ -50,17 +58,16 @@
             <form method="post" class="space-y-6">
                 {% csrf_token %}
 
-                <!-- Número de Login -->
-                <div>
-                    <label for="{{ form.numero_login.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                        {{ form.numero_login.label }}
-                        <span class="text-red-500">*</span>
-                    </label>
-                    {{ form.numero_login }}
-                    {% if form.numero_login.errors %}
-                        <p class="mt-2 text-sm text-red-600">{{ form.numero_login.errors.0 }}</p>
-                    {% endif %}
-                    <p class="mt-1 text-sm text-gray-500">Número único para identificação do usuário</p>
+                <!-- Informações Somente Leitura -->
+                <div class="bg-gray-50 rounded-lg p-4 space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-sm font-medium text-gray-700">Número de Login:</span>
+                        <span class="text-sm text-gray-900 font-semibold">{{ usuario_editado.numero_login }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm font-medium text-gray-700">Criado em:</span>
+                        <span class="text-sm text-gray-900">{{ usuario_editado.criado_em|date:"d/m/Y H:i" }}</span>
+                    </div>
                 </div>
 
                 <!-- Nome -->
@@ -104,30 +111,54 @@
                     </div>
                 </div>
 
-                <!-- PIN -->
+                <!-- Status Ativo -->
                 <div>
-                    <label for="{{ form.pin.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                        {{ form.pin.label }}
-                        <span class="text-red-500">*</span>
-                    </label>
-                    {{ form.pin }}
-                    {% if form.pin.errors %}
-                        <p class="mt-2 text-sm text-red-600">{{ form.pin.errors.0 }}</p>
+                    <div class="flex items-start">
+                        <div class="flex items-center h-5">
+                            {{ form.ativo }}
+                        </div>
+                        <div class="ml-3 text-sm">
+                            <label for="{{ form.ativo.id_for_label }}" class="font-medium text-gray-700">
+                                {{ form.ativo.label }}
+                            </label>
+                            <p class="text-gray-500">Usuários inativos não podem fazer login no sistema</p>
+                        </div>
+                    </div>
+                    {% if form.ativo.errors %}
+                        <p class="mt-2 text-sm text-red-600">{{ form.ativo.errors.0 }}</p>
                     {% endif %}
-                    <p class="mt-1 text-sm text-gray-500">PIN de 4 dígitos numéricos</p>
                 </div>
 
-                <!-- Confirmar PIN -->
-                <div>
-                    <label for="{{ form.pin_confirmacao.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                        {{ form.pin_confirmacao.label }}
-                        <span class="text-red-500">*</span>
-                    </label>
-                    {{ form.pin_confirmacao }}
-                    {% if form.pin_confirmacao.errors %}
-                        <p class="mt-2 text-sm text-red-600">{{ form.pin_confirmacao.errors.0 }}</p>
-                    {% endif %}
-                    <p class="mt-1 text-sm text-gray-500">Digite o mesmo PIN novamente</p>
+                <!-- Divisor -->
+                <div class="border-t pt-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Alterar PIN (Opcional)</h3>
+                    <p class="text-sm text-gray-600 mb-4">
+                        Deixe os campos abaixo em branco para manter o PIN atual
+                    </p>
+
+                    <!-- Novo PIN -->
+                    <div class="mb-4">
+                        <label for="{{ form.pin.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                            {{ form.pin.label }}
+                        </label>
+                        {{ form.pin }}
+                        {% if form.pin.errors %}
+                            <p class="mt-2 text-sm text-red-600">{{ form.pin.errors.0 }}</p>
+                        {% endif %}
+                        <p class="mt-1 text-sm text-gray-500">PIN de 4 dígitos numéricos</p>
+                    </div>
+
+                    <!-- Confirmar Novo PIN -->
+                    <div>
+                        <label for="{{ form.pin_confirmacao.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                            {{ form.pin_confirmacao.label }}
+                        </label>
+                        {{ form.pin_confirmacao }}
+                        {% if form.pin_confirmacao.errors %}
+                            <p class="mt-2 text-sm text-red-600">{{ form.pin_confirmacao.errors.0 }}</p>
+                        {% endif %}
+                        <p class="mt-1 text-sm text-gray-500">Digite o mesmo PIN novamente</p>
+                    </div>
                 </div>
 
                 <!-- Botões -->
@@ -139,7 +170,7 @@
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                         </svg>
-                        Criar Usuário
+                        Salvar Alterações
                     </button>
                 </div>
             </form>
@@ -159,9 +190,9 @@
                     </h3>
                     <div class="mt-2 text-sm text-yellow-700">
                         <p>
-                            • O número de login deve ser único e não pode ser alterado depois<br>
-                            • O PIN deve ter exatamente 4 dígitos numéricos<br>
-                            • Guarde as credenciais em local seguro
+                            • O número de login não pode ser alterado<br>
+                            • O PIN só será alterado se você preencher os campos acima<br>
+                            • Desativar um usuário impedirá que ele faça login
                         </p>
                     </div>
                 </div>

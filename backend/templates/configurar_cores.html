@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block title %}Personalizar Cores - Separação PMCELL{% endblock %}
+
+{% block content %}
+<div class="flex h-screen bg-gray-50">
+    <!-- Sidebar -->
+    {% include "partials/_sidebar_menu.html" %}
+
+    <!-- Main Content -->
+    <div class="flex-1 overflow-auto">
+        <!-- Header -->
+        <div class="bg-white shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-900">Personalizar Cores</h1>
+                        <p class="mt-1 text-sm text-gray-500">Configure as cores do tema do sistema</p>
+                    </div>
+                    <!-- User Dropdown -->
+                    {% include "partials/_user_dropdown.html" %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        {% if messages %}
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+            {% for message in messages %}
+            <div class="rounded-md {% if message.tags == 'success' %}bg-green-50 border-green-400{% elif message.tags == 'error' %}bg-red-50 border-red-400{% else %}bg-blue-50 border-blue-400{% endif %} border-l-4 p-4">
+                <div class="flex">
+                    <div class="ml-3">
+                        <p class="text-sm {% if message.tags == 'success' %}text-green-700{% elif message.tags == 'error' %}text-red-700{% else %}text-blue-700{% endif %}">
+                            {{ message }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Content -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6"
+             x-data="{
+                 colors: {
+                     primary_color: '{{ form.primary_color.value }}',
+                     primary_hover: '{{ form.primary_hover.value }}',
+                     vendedor_color: '{{ form.vendedor_color.value }}',
+                     separador_color: '{{ form.separador_color.value }}',
+                     compradora_color: '{{ form.compradora_color.value }}',
+                     admin_color: '{{ form.admin_color.value }}',
+                     success_color: '{{ form.success_color.value }}',
+                     warning_color: '{{ form.warning_color.value }}',
+                     info_color: '{{ form.info_color.value }}'
+                 }
+             }">
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Formulário (Esquerda) -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Configuração de Cores</h2>
+
+                    <form method="post" id="colorForm">
+                        {% csrf_token %}
+
+                        <!-- Cores Primárias -->
+                        <div class="mb-6">
+                            <h3 class="text-md font-medium text-gray-700 mb-3 pb-2 border-b">Cores Primárias</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        {{ form.primary_color.label }}
+                                    </label>
+                                    {{ form.primary_color }}
+                                    <p class="mt-1 text-xs text-gray-500">{{ form.primary_color.help_text }}</p>
+                                    {% if form.primary_color.errors %}
+                                    <p class="mt-1 text-xs text-red-600">{{ form.primary_color.errors.0 }}</p>
+                                    {% endif %}
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        {{ form.primary_hover.label }}
+                                    </label>
+                                    {{ form.primary_hover }}
+                                    <p class="mt-1 text-xs text-gray-500">{{ form.primary_hover.help_text }}</p>
+                                    {% if form.primary_hover.errors %}
+                                    <p class="mt-1 text-xs text-red-600">{{ form.primary_hover.errors.0 }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Cores de Papéis -->
+                        <div class="mb-6">
+                            <h3 class="text-md font-medium text-gray-700 mb-3 pb-2 border-b">Cores de Papéis</h3>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        {{ form.vendedor_color.label }}
+                                    </label>
+                                    {{ form.vendedor_color }}
+                                    <p class="mt-1 text-xs text-gray-500">{{ form.vendedor_color.help_text }}</p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        {{ form.separador_color.label }}
+                                    </label>
+                                    {{ form.separador_color }}
+                                    <p class="mt-1 text-xs text-gray-500">{{ form.separador_color.help_text }}</p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        {{ form.compradora_color.label }}
+                                    </label>
+                                    {{ form.compradora_color }}
+                                    <p class="mt-1 text-xs text-gray-500">{{ form.compradora_color.help_text }}</p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        {{ form.admin_color.label }}
+                                    </label>
+                                    {{ form.admin_color }}
+                                    <p class="mt-1 text-xs text-gray-500">{{ form.admin_color.help_text }}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Cores de Status -->
+                        <div class="mb-6">
+                            <h3 class="text-md font-medium text-gray-700 mb-3 pb-2 border-b">Cores de Status</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        {{ form.success_color.label }}
+                                    </label>
+                                    {{ form.success_color }}
+                                    <p class="mt-1 text-xs text-gray-500">{{ form.success_color.help_text }}</p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        {{ form.warning_color.label }}
+                                    </label>
+                                    {{ form.warning_color }}
+                                    <p class="mt-1 text-xs text-gray-500">{{ form.warning_color.help_text }}</p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        {{ form.info_color.label }}
+                                    </label>
+                                    {{ form.info_color }}
+                                    <p class="mt-1 text-xs text-gray-500">{{ form.info_color.help_text }}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Botões de Ação -->
+                        <div class="flex items-center justify-between pt-4 border-t">
+                            <button
+                                type="submit"
+                                name="reset"
+                                value="1"
+                                onclick="return confirm('Tem certeza que deseja resetar todas as cores para o padrão?')"
+                                class="inline-flex items-center px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                </svg>
+                                Resetar Padrão
+                            </button>
+
+                            <div class="flex gap-2">
+                                <a
+                                    href="{% url 'dashboard' %}"
+                                    class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                                    Cancelar
+                                </a>
+                                <button
+                                    type="submit"
+                                    class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                    Salvar Cores
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Preview (Direita) -->
+                <div class="bg-white rounded-lg shadow p-6" x-cloak>
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Preview em Tempo Real</h2>
+
+                    <div class="space-y-4">
+                        <!-- Preview: Botões -->
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">Botões</h4>
+                            <div class="flex flex-wrap gap-2">
+                                <button
+                                    :style="'background-color: ' + (document.getElementById('id_primary_color')?.value || colors.primary_color)"
+                                    class="px-4 py-2 text-white text-sm font-medium rounded-lg">
+                                    Botão Primário
+                                </button>
+                                <button
+                                    :style="'background-color: ' + (document.getElementById('id_success_color')?.value || colors.success_color)"
+                                    class="px-4 py-2 text-white text-sm font-medium rounded-lg">
+                                    Botão Sucesso
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Preview: Badges de Papéis -->
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">Badges de Papéis</h4>
+                            <div class="flex flex-wrap gap-2">
+                                <span
+                                    :style="'background-color: ' + (document.getElementById('id_vendedor_color')?.value || colors.vendedor_color) + '33; color: ' + (document.getElementById('id_vendedor_color')?.value || colors.vendedor_color)"
+                                    class="px-3 py-1 text-xs font-semibold rounded-full">
+                                    Vendedor
+                                </span>
+                                <span
+                                    :style="'background-color: ' + (document.getElementById('id_separador_color')?.value || colors.separador_color) + '33; color: ' + (document.getElementById('id_separador_color')?.value || colors.separador_color)"
+                                    class="px-3 py-1 text-xs font-semibold rounded-full">
+                                    Separador
+                                </span>
+                                <span
+                                    :style="'background-color: ' + (document.getElementById('id_compradora_color')?.value || colors.compradora_color) + '33; color: ' + (document.getElementById('id_compradora_color')?.value || colors.compradora_color)"
+                                    class="px-3 py-1 text-xs font-semibold rounded-full">
+                                    Compradora
+                                </span>
+                                <span
+                                    :style="'background-color: ' + (document.getElementById('id_admin_color')?.value || colors.admin_color) + '33; color: ' + (document.getElementById('id_admin_color')?.value || colors.admin_color)"
+                                    class="px-3 py-1 text-xs font-semibold rounded-full">
+                                    Administrador
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Preview: Card com Border de Acento -->
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">Card com Acento</h4>
+                            <div
+                                :style="'border-left-color: ' + (document.getElementById('id_primary_color')?.value || colors.primary_color)"
+                                class="bg-white border-l-4 rounded-lg shadow p-4">
+                                <h3 class="text-sm font-semibold text-gray-900">Pedido #30567</h3>
+                                <p class="text-xs text-gray-600 mt-1">Cliente: João Silva</p>
+                                <div class="mt-2 flex items-center gap-2">
+                                    <span
+                                        :style="'background-color: ' + (document.getElementById('id_success_color')?.value || colors.success_color) + '33; color: ' + (document.getElementById('id_success_color')?.value || colors.success_color)"
+                                        class="px-2 py-1 text-xs font-semibold rounded-full">
+                                        Ativo
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Preview: Progress Bar -->
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">Barra de Progresso</h4>
+                            <div class="bg-gray-200 rounded-full h-3 overflow-hidden">
+                                <div
+                                    :style="'background: linear-gradient(90deg, ' + (document.getElementById('id_info_color')?.value || colors.info_color) + ' 0%, ' + (document.getElementById('id_success_color')?.value || colors.success_color) + ' 100%)'"
+                                    class="h-full transition-all"
+                                    style="width: 65%">
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">65% completo</p>
+                        </div>
+
+                        <!-- Preview: Status Indicators -->
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">Indicadores de Status</h4>
+                            <div class="space-y-2">
+                                <div class="flex items-center gap-2">
+                                    <span
+                                        :style="'background-color: ' + (document.getElementById('id_success_color')?.value || colors.success_color)"
+                                        class="w-2 h-2 rounded-full"></span>
+                                    <span class="text-sm text-gray-700">Online / Ativo</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span
+                                        :style="'background-color: ' + (document.getElementById('id_warning_color')?.value || colors.warning_color)"
+                                        class="w-2 h-2 rounded-full"></span>
+                                    <span class="text-sm text-gray-700">Aguardando / Pendente</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span
+                                        :style="'background-color: ' + (document.getElementById('id_info_color')?.value || colors.info_color)"
+                                        class="w-2 h-2 rounded-full"></span>
+                                    <span class="text-sm text-gray-700">Em Processamento</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Preview: Link Ativo (Menu) -->
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">Item de Menu Ativo</h4>
+                            <div
+                                :style="'background-color: ' + (document.getElementById('id_primary_color')?.value || colors.primary_color) + '1A; color: ' + (document.getElementById('id_primary_color')?.value || colors.primary_color) + '; border-left-color: ' + (document.getElementById('id_primary_color')?.value || colors.primary_color)"
+                                class="border-l-4 px-4 py-2 rounded">
+                                <span class="text-sm font-medium">Dashboard</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Nota -->
+                    <div class="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p class="text-xs text-blue-800">
+                            <strong>Dica:</strong> As alterações no preview são apenas visualização.
+                            Clique em "Salvar Cores" para aplicar as mudanças em todo o sistema.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

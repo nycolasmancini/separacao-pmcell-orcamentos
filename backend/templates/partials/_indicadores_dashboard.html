@@ -1,0 +1,90 @@
+{# Partial Template: Indicadores Minimalistas do Dashboard #}
+{# Este componente renderiza 4 indicadores compactos com design minimalista #}
+{# Recebe como contexto: metricas_tempo, pedidos_finalizados_hoje, pedidos_em_aberto #}
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <!-- Indicador 1: Tempo Médio Hoje -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow duration-200">
+        <!-- Linha 1: Ícone + Nome (lado a lado) -->
+        <div class="flex items-center gap-2 mb-3">
+            <svg class="h-8 w-8 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Tempo Médio Hoje</p>
+        </div>
+        <!-- Linha 2: Valor (centralizado) -->
+        <p class="text-2xl font-bold text-gray-900 text-center">
+            {% if metricas_tempo.tendencia == 'sem_dados' %}
+                --
+            {% else %}
+                {{ metricas_tempo.tempo_hoje_formatado }}
+            {% endif %}
+        </p>
+    </div>
+
+    <!-- Indicador 2: Tempo Médio 7 Dias -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow duration-200">
+        <!-- Linha 1: Ícone + Nome (lado a lado) -->
+        <div class="flex items-center gap-2 mb-3">
+            <svg class="h-8 w-8 text-indigo-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Últimos 7 Dias</p>
+        </div>
+        <!-- Linha 2: Valor (centralizado) -->
+        <p class="text-2xl font-bold text-gray-900 text-center">
+            {% if metricas_tempo.tendencia == 'sem_dados' %}
+                --
+            {% else %}
+                {{ metricas_tempo.tempo_7dias_formatado }}
+            {% endif %}
+        </p>
+    </div>
+
+    <!-- Indicador 3: Pedidos Finalizados Hoje -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-all duration-200" id="indicador-finalizados">
+        <!-- Linha 1: Ícone + Nome (lado a lado) -->
+        <div class="flex items-center gap-2 mb-3">
+            <svg class="h-8 w-8 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Finalizados Hoje</p>
+        </div>
+        <!-- Linha 2: Valor (centralizado) -->
+        <p class="text-2xl font-bold text-gray-900 text-center transition-all duration-300" id="valor-finalizados">{{ pedidos_finalizados_hoje }}</p>
+    </div>
+
+    <!-- Indicador 4: Pedidos Em Aberto -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-all duration-200" id="indicador-em-aberto">
+        <!-- Linha 1: Ícone + Nome (lado a lado) -->
+        <div class="flex items-center gap-2 mb-3">
+            <svg class="h-8 w-8 text-orange-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Em Aberto</p>
+        </div>
+        <!-- Linha 2: Valor (centralizado) -->
+        <p class="text-2xl font-bold text-gray-900 text-center transition-all duration-300" id="valor-em-aberto">{{ pedidos_em_aberto }}</p>
+    </div>
+</div>
+
+{# Indicador de Tendência (opcional, compacto) #}
+{% if metricas_tempo.tendencia != 'sem_dados' and metricas_tempo.tendencia != 'estavel' %}
+    <div class="mb-6 flex justify-center">
+        {% if metricas_tempo.tendencia == 'melhorou' %}
+            <div class="inline-flex items-center px-3 py-1 rounded-full bg-green-50 border border-green-200">
+                <svg class="h-4 w-4 mr-1 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                </svg>
+                <span class="text-xs font-medium text-green-700">{{ metricas_tempo.percentual_formatado }} mais rápido hoje</span>
+            </div>
+        {% elif metricas_tempo.tendencia == 'piorou' %}
+            <div class="inline-flex items-center px-3 py-1 rounded-full bg-red-50 border border-red-200">
+                <svg class="h-4 w-4 mr-1 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                </svg>
+                <span class="text-xs font-medium text-red-700">{{ metricas_tempo.percentual_formatado }} mais lento hoje</span>
+            </div>
+        {% endif %}
+    </div>
+{% endif %}

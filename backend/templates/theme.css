@@ -1,0 +1,173 @@
+/*
+ * CSS Dinâmico gerado com base nas configurações de tema
+ * Este arquivo é servido como text/css e define CSS variables customizáveis
+ */
+
+:root {
+    /* Cores Primárias */
+    {{ --color-primary }}: {{ theme.primary_color }};
+    {{ --color-primary-hover }}: {{ theme.primary_hover }};
+
+    /* Cores de Papéis */
+    {{ --color-vendedor }}: {{ theme.vendedor_color }};
+    {{ --color-separador }}: {{ theme.separador_color }};
+    {{ --color-compradora }}: {{ theme.compradora_color }};
+    {{ --color-admin }}: {{ theme.admin_color }};
+
+    /* Cores de Status */
+    {{ --color-success }}: {{ theme.success_color }};
+    {{ --color-warning }}: {{ theme.warning_color }};
+    {{ --color-info }}: {{ theme.info_color }};
+}
+
+/* Utilitários de Background */
+.bg-primary { background-color: var(--color-primary) !important; }
+.bg-primary-hover:hover { background-color: var(--color-primary-hover) !important; }
+
+.bg-vendedor { background-color: var(--color-vendedor) !important; }
+.bg-separador { background-color: var(--color-separador) !important; }
+.bg-compradora { background-color: var(--color-compradora) !important; }
+.bg-admin { background-color: var(--color-admin) !important; }
+
+.bg-success { background-color: var(--color-success) !important; }
+.bg-warning { background-color: var(--color-warning) !important; }
+.bg-info { background-color: var(--color-info) !important; }
+
+/* Utilitários de Text */
+.text-primary { color: var(--color-primary) !important; }
+.text-vendedor { color: var(--color-vendedor) !important; }
+.text-separador { color: var(--color-separador) !important; }
+.text-compradora { color: var(--color-compradora) !important; }
+.text-admin { color: var(--color-admin) !important; }
+
+.text-success { color: var(--color-success) !important; }
+.text-warning { color: var(--color-warning) !important; }
+.text-info { color: var(--color-info) !important; }
+
+/* Utilitários de Border */
+.border-primary { border-color: var(--color-primary) !important; }
+.border-vendedor { border-color: var(--color-vendedor) !important; }
+.border-separador { border-color: var(--color-separador) !important; }
+.border-compradora { border-color: var(--color-compradora) !important; }
+.border-admin { border-color: var(--color-admin) !important; }
+
+.border-success { border-color: var(--color-success) !important; }
+.border-warning { border-color: var(--color-warning) !important; }
+.border-info { border-color: var(--color-info) !important; }
+
+/* Classes de Botões Customizados */
+.btn-primary {
+    background-color: var(--color-primary);
+    color: white;
+    transition: background-color 0.2s;
+}
+
+.btn-primary:hover {
+    background-color: var(--color-primary-hover);
+}
+
+.btn-success {
+    background-color: var(--color-success);
+    color: white;
+    transition: background-color 0.2s;
+}
+
+.btn-success:hover {
+    filter: brightness(0.9);
+}
+
+/* Classes de Badges por Papel */
+.badge-vendedor {
+    background-color: rgba(16, 185, 129, 0.1);
+    color: rgb(6, 95, 70);
+}
+
+.badge-separador {
+    background-color: rgba(139, 92, 246, 0.1);
+    color: rgb(91, 33, 182);
+}
+
+.badge-compradora {
+    background-color: rgba(249, 115, 22, 0.1);
+    color: rgb(154, 52, 18);
+}
+
+.badge-admin {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: rgb(153, 27, 27);
+}
+
+/* Gradientes para Logo e Avatares */
+.gradient-primary {
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
+}
+
+.gradient-success {
+    background: linear-gradient(135deg, var(--color-success) 0%, var(--color-info) 100%);
+}
+
+/* Estados Hover para Menu Lateral */
+.menu-item-hover:hover {
+    background-color: rgba(59, 130, 246, 0.05);
+    color: var(--color-primary);
+}
+
+.menu-item-active {
+    background-color: rgba(59, 130, 246, 0.1);
+    color: var(--color-primary);
+    border-left: 4px solid var(--color-primary);
+}
+
+/* Card com Border de Acento */
+.card-accent-primary {
+    border-left: 4px solid var(--color-primary);
+}
+
+.card-accent-success {
+    border-left: 4px solid var(--color-success);
+}
+
+.card-accent-warning {
+    border-left: 4px solid var(--color-warning);
+}
+
+.card-accent-info {
+    border-left: 4px solid var(--color-info);
+}
+
+/* Progress Bar */
+.progress-primary {
+    background-color: var(--color-primary);
+}
+
+.progress-success {
+    background: linear-gradient(90deg, var(--color-info) 0%, var(--color-success) 100%);
+}
+
+/* Ring (Focus) */
+.ring-primary:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+}
+
+/* Status Indicator Dots */
+.status-dot-success {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--color-success);
+}
+
+.status-dot-warning {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--color-warning);
+}
+
+.status-dot-info {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--color-info);
+}

@@ -1,3 +1,4 @@
+{% load static %}
 {# Partial template para grid de pedidos - Fase 19 #}
 {# Usado para: #}
 {# - Renderização inicial do dashboard #}
@@ -121,12 +122,10 @@
     {% else %}
         <!-- Estado Vazio -->
         <div class="bg-white rounded-lg shadow-md p-12 text-center">
-            <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-            </svg>
-            <h3 class="mt-4 text-lg font-medium text-gray-900">Nenhum pedido encontrado</h3>
+            <img src="{% static 'images/mascot-waiting.png' %}?v={{ cache_bust }}" alt="Mascote aguardando pedidos" class="mx-auto h-32 w-32 sm:h-40 sm:w-40 object-contain">
+            <h3 class="mt-4 text-lg font-medium text-gray-900">{{ mensagem_do_dia.titulo }}</h3>
             <p class="mt-2 text-sm text-gray-500">
-                Nenhum pedido em separação corresponde aos filtros aplicados.
+                {{ mensagem_do_dia.subtitulo }}
             </p>
         </div>
     {% endif %}

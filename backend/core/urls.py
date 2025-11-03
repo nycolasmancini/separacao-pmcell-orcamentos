@@ -35,7 +35,12 @@ from core.presentation.web.views import (
     MetricasView,
     AdminPanelView,
     CriarUsuarioView,
-    ItemPedidoPartialView  # Fase 35
+    EditarUsuarioView,
+    DeletarUsuarioView,
+    ReativarUsuarioView,
+    ItemPedidoPartialView,  # Fase 35
+    dynamic_theme_css,  # CSS dinâmico para personalização de cores
+    ConfigurarCoresView  # View de configuração de cores do tema
 )
 
 urlpatterns = [
@@ -49,6 +54,10 @@ urlpatterns = [
     path('compras/', PainelComprasView.as_view(), name='painel_compras'),
     path('usuarios/', AdminPanelView.as_view(), name='admin_panel'),  # Painel Admin
     path('usuarios/criar/', CriarUsuarioView.as_view(), name='criar_usuario'),  # Criar Usuário
+    path('usuarios/<int:user_id>/editar/', EditarUsuarioView.as_view(), name='editar_usuario'),  # Editar Usuário
+    path('usuarios/<int:user_id>/deletar/', DeletarUsuarioView.as_view(), name='deletar_usuario'),  # Deletar Usuário
+    path('usuarios/<int:user_id>/reativar/', ReativarUsuarioView.as_view(), name='reativar_usuario'),  # Reativar Usuário
+    path('configurar-cores/', ConfigurarCoresView.as_view(), name='configurar_cores'),  # Configuração de Cores do Tema
     path('compras/itens/<int:item_id>/marcar-realizado/', MarcarPedidoRealizadoView.as_view(), name='marcar_realizado'),
     path('pedidos/novo/', UploadOrcamentoView.as_view(), name='upload_orcamento'),
     path('pedidos/<int:pedido_id>/', DetalhePedidoView.as_view(), name='detalhe_pedido'),
@@ -60,4 +69,7 @@ urlpatterns = [
     path('pedidos/<int:pedido_id>/itens/<int:item_id>/substituir/', SubstituirItemView.as_view(), name='substituir_item'),
     path('pedidos/<int:pedido_id>/finalizar/', FinalizarPedidoView.as_view(), name='finalizar_pedido'),
     path('pedidos/<int:pedido_id>/reabrir/', ReabrirPedidoView.as_view(), name='reabrir_pedido'),
+
+    # CSS Dinâmico para Tema
+    path('theme.css', dynamic_theme_css, name='dynamic_theme_css'),
 ]
