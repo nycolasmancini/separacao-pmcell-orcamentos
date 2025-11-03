@@ -1,6 +1,6 @@
 # Dockerfile for Railway deployment
 # Uses Python 3.11 with PostgreSQL client libraries
-# Updated: 2025-11-03 - PORT variable fix applied
+# Updated: 2025-11-03 - Force rebuild with PyPDF2 fix
 
 FROM python:3.11-slim
 
@@ -16,8 +16,9 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements first for better caching
 COPY backend/requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Upgrade pip and install Python dependencies
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY backend/ .
