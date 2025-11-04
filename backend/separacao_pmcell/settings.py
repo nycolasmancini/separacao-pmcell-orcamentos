@@ -173,9 +173,29 @@ SESSION_COOKIE_AGE = 28800  # 8 hours in seconds
 SESSION_SAVE_EVERY_REQUEST = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
-# Cache configuration
+# Cache configuration & Channel Layers
 # Fase 35: Redis via REDIS_URL em produção, localhost em desenvolvimento
-REDIS_URL = config('REDIS_URL', default='redis://127.0.0.1:6379/1')
+# Parse seguro da REDIS_URL para evitar erros com placeholders
+REDIS_URL_RAW = config('REDIS_URL', default='redis://127.0.0.1:6379/1')
+
+# Parse do REDIS_URL para extrair componentes
+redis_url_parsed = urllib.parse.urlparse(REDIS_URL_RAW)
+redis_host = redis_url_parsed.hostname or '127.0.0.1'
+redis_password = redis_url_parsed.password or None
+redis_db = redis_url_parsed.path.lstrip('/') or '1'
+
+# Tratamento robusto da porta para evitar erro com placeholders como 'port'
+try:
+    redis_port = int(redis_url_parsed.port) if redis_url_parsed.port else 6379
+except (ValueError, TypeError):
+    # Se a porta não puder ser convertida (ex: placeholder 'port'), usa padrão
+    redis_port = 6379
+
+# Reconstrói uma REDIS_URL válida e segura
+if redis_password:
+    REDIS_URL = f"redis://:{redis_password}@{redis_host}:{redis_port}/{redis_db}"
+else:
+    REDIS_URL = f"redis://{redis_host}:{redis_port}/{redis_db}"
 
 CACHES = {
     'default': {
@@ -187,16 +207,6 @@ CACHES = {
 }
 
 # Fase 29: Channel Layers (Redis para WebSockets)
-# Parse do REDIS_URL para extrair host e porta
-redis_url_parsed = urllib.parse.urlparse(REDIS_URL)
-redis_host = redis_url_parsed.hostname or '127.0.0.1'
-
-# Tratamento robusto da porta para evitar erro com placeholders
-try:
-    redis_port = int(redis_url_parsed.port) if redis_url_parsed.port else 6379
-except (ValueError, TypeError):
-    redis_port = 6379  # Fallback para porta padrão
-
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
