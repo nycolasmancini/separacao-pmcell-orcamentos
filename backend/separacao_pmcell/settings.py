@@ -7,9 +7,14 @@ Fase 35: Configuração para Deploy em Produção
 import os
 import sys
 import urllib.parse
+import socket
+import logging
 from pathlib import Path
 from decouple import config, Csv
 import dj_database_url
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -175,6 +180,40 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
 # Cache configuration & Channel Layers
 # Fase 35: Redis via REDIS_URL em produção, localhost em desenvolvimento
+# Fase 36: Redis com fallback inteligente para ambientes sem Redis
+
+def is_redis_available(redis_url_raw):
+    """
+    Valida se Redis URL contém hostname válido e resolvível.
+    Retorna False se o hostname é um placeholder ou não pode ser resolvido.
+    """
+    parsed = urllib.parse.urlparse(redis_url_raw)
+    hostname = parsed.hostname
+
+    # Lista de placeholders comuns que Railway pode usar
+    invalid_hostnames = ['host', 'password', 'username', 'port', 'your-redis-host']
+
+    # Em produção, rejeita placeholders
+    if not DEBUG and hostname and hostname.lower() in invalid_hostnames:
+        logger.warning(f"Redis hostname '{hostname}' appears to be a placeholder - using fallback cache")
+        return False
+
+    # Em desenvolvimento, aceita localhost e 127.0.0.1
+    if hostname in ['127.0.0.1', 'localhost', None]:
+        # Aceita em desenvolvimento, mas verifica disponibilidade em produção
+        if not DEBUG:
+            return False
+        return True
+
+    # Tenta resolver o hostname para verificar se é válido
+    try:
+        socket.gethostbyname(hostname)
+        logger.info(f"Redis hostname '{hostname}' resolved successfully")
+        return True
+    except (socket.gaierror, socket.herror, OSError) as e:
+        logger.warning(f"Cannot resolve Redis hostname '{hostname}': {e} - using fallback cache")
+        return False
+
 # Parse seguro da REDIS_URL para evitar erros com placeholders
 REDIS_URL_RAW = config('REDIS_URL', default='redis://127.0.0.1:6379/1')
 
@@ -197,24 +236,53 @@ if redis_password:
 else:
     REDIS_URL = f"redis://{redis_host}:{redis_port}/{redis_db}"
 
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': REDIS_URL,
-        'KEY_PREFIX': 'separacao_pmcell',
-        'TIMEOUT': config('CACHE_TIMEOUT', default=300, cast=int),  # 5 minutos default
-    }
-}
+# Configuração do cache com fallback inteligente
+USE_REDIS_CACHE = is_redis_available(REDIS_URL_RAW)
 
-# Fase 29: Channel Layers (Redis para WebSockets)
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [(redis_host, redis_port)],
+if USE_REDIS_CACHE:
+    # Usa Redis quando disponível
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': REDIS_URL,
+            'KEY_PREFIX': 'separacao_pmcell',
+            'TIMEOUT': config('CACHE_TIMEOUT', default=300, cast=int),
+        }
+    }
+    logger.info(f"✓ Using Redis cache backend: {redis_host}:{redis_port}")
+else:
+    # Fallback para cache local (desenvolvimento ou produção sem Redis)
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'separacao_pmcell_cache',
+            'OPTIONS': {
+                'MAX_ENTRIES': 1000
+            }
+        }
+    }
+    logger.warning("⚠ Using local memory cache backend (Redis not available)")
+
+# Fase 29: Channel Layers (Redis para WebSockets) com fallback
+if USE_REDIS_CACHE:
+    # Usa Redis para WebSockets quando disponível
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [(redis_host, redis_port)],
+            },
         },
-    },
-}
+    }
+    logger.info("✓ Using Redis channel layer for WebSockets")
+else:
+    # Fallback para InMemory (apenas desenvolvimento/single-server)
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
+    logger.warning("⚠ Using in-memory channel layer (WebSockets work only on single server)")
 
 # Fase 34: Django Debug Toolbar
 INTERNAL_IPS = [
